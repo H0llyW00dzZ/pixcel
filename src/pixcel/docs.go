@@ -21,4 +21,5 @@
 //   - [WithTargetWidth] sets the output width in table cells (default: 56).
 //   - [WithTargetHeight] sets the output height in table cells (default: proportional).
 //   - [WithHTMLWrapper] toggles the full HTML document wrapper (default: on).
+//   - [WithSmoothLoad] hides content until fully loaded to prevent progressive rendering (default: off).
 package pixcel

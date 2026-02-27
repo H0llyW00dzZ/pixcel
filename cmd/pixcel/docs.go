@@ -19,14 +19,16 @@
 //	pixcel convert logo.jpg -W 80 -o art.html
 //	pixcel convert icon.gif -W 100 -H 50 -o stretched.html
 //	pixcel convert icon.gif --no-html
+//	pixcel convert art.png -W 600 -H 306 -o art.html --smooth-load
 //
 // # Flags
 //
-//   - -W, --width     target width in table cells (default: 56)
-//   - -H, --height    target height in table cells (default: proportional)
-//   - -o, --output    output HTML file path (default: pixel_art.html)
-//   - -t, --title     title for the HTML page (default: Go Pixel Art)
-//   - --no-html       output only the <table>, omit the HTML wrapper
+//   - -W, --width       target width in table cells (default: 56)
+//   - -H, --height      target height in table cells (default: proportional)
+//   - -o, --output      output HTML file path (default: go_pixel_art.html)
+//   - -t, --title       title for the HTML page (default: Go Pixel Art)
+//   - --no-html         output only the <table>, omit the HTML wrapper
+//   - --smooth-load     hide content until fully loaded to prevent progressive rendering
 //
 // # SDK Usage
 //

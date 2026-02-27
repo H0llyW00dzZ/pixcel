@@ -46,6 +46,9 @@ pixcel convert sprite.png --no-html -o table.html
 
 # Custom page title
 pixcel convert art.png -t "My Pixel Art" -o gallery.html
+
+# Smooth load (hides content until fully rendered)
+pixcel convert art.png -W 600 -H 306 -o art.html --smooth-load
 ```
 
 ### SDK
@@ -73,6 +76,7 @@ func main() {
         pixcel.WithTargetWidth(64),
         pixcel.WithTargetHeight(32),            // optional: fixed height
         pixcel.WithHTMLWrapper(true, "Art"),   // full HTML page with title
+        pixcel.WithSmoothLoad(true),            // optional: hide until loaded
     )
 
     // Convert and write to file
@@ -89,8 +93,9 @@ func main() {
 | `WithTargetWidth` | `-W, --width` | `56` | Output width in table cells |
 | `WithTargetHeight` | `-H, --height` | proportional | Output height in table cells |
 | `WithHTMLWrapper` | `--no-html` | `true` | Include full HTML document wrapper |
+| `WithSmoothLoad` | `--smooth-load` | `false` | Hide content until fully loaded to prevent progressive rendering |
 | — | `-t, --title` | `Go Pixel Art` | HTML page title |
-| — | `-o, --output` | `pixel_art.html` | Output file path |
+| — | `-o, --output` | `go_pixel_art.html` | Output file path |
 
 ## Project Structure
 

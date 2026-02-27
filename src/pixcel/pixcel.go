@@ -18,6 +18,7 @@ type Converter struct {
 	targetHeight int
 	withHTML     bool
 	htmlTitle    string
+	smoothLoad   bool
 }
 
 // New creates a new Converter with the provided options.
