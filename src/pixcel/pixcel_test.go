@@ -625,3 +625,72 @@ func TestConvertGIF_ProportionalHeight(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 	assert.Contains(t, buf.String(), `height="2"`)
 }
+
+// --- SmoothLoad tests ---
+
+func TestWithSmoothLoad_Enabled(t *testing.T) {
+	c := New(WithSmoothLoad(true))
+	assert.True(t, c.smoothLoad)
+}
+
+func TestWithSmoothLoad_Disabled(t *testing.T) {
+	c := New(WithSmoothLoad(false))
+	assert.False(t, c.smoothLoad)
+}
+
+func TestNew_Defaults_SmoothLoad(t *testing.T) {
+	c := New()
+	assert.False(t, c.smoothLoad, "default smoothLoad should be false")
+}
+
+func TestConverter_Convert_WithSmoothLoad(t *testing.T) {
+	img := createTestImage()
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "Smooth"), WithSmoothLoad(true))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.Convert(context.Background(), img, &buf))
+
+	output := buf.String()
+	assert.Contains(t, output, "opacity: 0")
+	assert.Contains(t, output, "transition: opacity")
+	assert.Contains(t, output, `.loaded`)
+	assert.Contains(t, output, `<script>`)
+}
+
+func TestConverter_Convert_WithoutSmoothLoad(t *testing.T) {
+	img := createTestImage()
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "No Smooth"), WithSmoothLoad(false))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.Convert(context.Background(), img, &buf))
+
+	output := buf.String()
+	assert.NotContains(t, output, "opacity: 0")
+	assert.NotContains(t, output, "transition: opacity")
+	assert.NotContains(t, output, `<script>`)
+}
+
+func TestConvertGIF_WithSmoothLoad(t *testing.T) {
+	g := createTestGIF(2, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "Smooth GIF"), WithSmoothLoad(true))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	assert.Contains(t, output, "visibility: hidden")
+	assert.Contains(t, output, `.loaded`)
+	assert.Contains(t, output, `<script>`)
+}
+
+func TestConvertGIF_WithoutSmoothLoad(t *testing.T) {
+	g := createTestGIF(2, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "No Smooth GIF"), WithSmoothLoad(false))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	assert.NotContains(t, output, "visibility: hidden")
+	assert.NotContains(t, output, `<script>`)
+}

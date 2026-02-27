@@ -40,6 +40,7 @@ type gifTemplateData struct {
 	TotalDurationCSS string
 	Frames           []gifFrameData
 	Keyframes        []gifKeyframe
+	SmoothLoad       bool
 }
 
 // ConvertGIF takes an animated GIF and writes animated HTML pixel art to the
@@ -131,6 +132,7 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		TotalDurationCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
 		Frames:           frames,
 		Keyframes:        keyframes,
+		SmoothLoad:       c.smoothLoad,
 	}
 
 	return gifTmpl.Execute(w, data)

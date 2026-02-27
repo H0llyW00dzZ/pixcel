@@ -31,7 +31,13 @@
     background: #16213e;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+{{- if .SmoothLoad}}
+    visibility: hidden;
+{{- end}}
   }
+{{- if .SmoothLoad}}
+  .pixcel-container.loaded { visibility: visible; }
+{{- end}}
   .pixcel-stage {
     position: relative;
     width: {{.Width}}px;
@@ -73,6 +79,9 @@
 </div>
 {{- if .WithHTML}}
 </div>
+{{- if .SmoothLoad}}
+<script>window.addEventListener("load",function(){document.querySelector(".pixcel-container").classList.add("loaded")});</script>
+{{- end}}
 </body>
 </html>
 {{- end}}

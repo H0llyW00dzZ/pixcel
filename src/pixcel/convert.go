@@ -24,11 +24,12 @@ type Cell struct {
 
 // templateData holds the dynamic data injected into the HTML template.
 type templateData struct {
-	WithHTML bool
-	Title    string
-	Width    int
-	Height   int
-	Rows     [][]Cell
+	WithHTML   bool
+	Title      string
+	Width      int
+	Height     int
+	Rows       [][]Cell
+	SmoothLoad bool
 }
 
 // generateHTML contains the core logic for scaling the image and building
@@ -97,11 +98,12 @@ func (c *Converter) buildTemplateData(ctx context.Context, img image.Image) (*te
 	}
 
 	return &templateData{
-		WithHTML: c.withHTML,
-		Title:    c.htmlTitle,
-		Width:    targetW,
-		Height:   targetH,
-		Rows:     rows,
+		WithHTML:   c.withHTML,
+		Title:      c.htmlTitle,
+		Width:      targetW,
+		Height:     targetH,
+		Rows:       rows,
+		SmoothLoad: c.smoothLoad,
 	}, nil
 }
 

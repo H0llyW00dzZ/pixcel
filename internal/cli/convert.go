@@ -16,11 +16,12 @@ import (
 
 // convertCmd flag values, scoped to this file.
 var (
-	flagWidth  int
-	flagHeight int
-	flagOutput string
-	flagNoHTML bool
-	flagTitle  string
+	flagWidth      int
+	flagHeight     int
+	flagOutput     string
+	flagNoHTML     bool
+	flagTitle      string
+	flagSmoothLoad bool
 )
 
 // convertCmd converts an image file to HTML pixel art.
@@ -35,9 +36,10 @@ var convertCmd = &cobra.Command{
 func init() {
 	convertCmd.Flags().IntVarP(&flagWidth, "width", "W", 56, "target width in table cells")
 	convertCmd.Flags().IntVarP(&flagHeight, "height", "H", 0, "target height in table cells (default: proportional)")
-	convertCmd.Flags().StringVarP(&flagOutput, "output", "o", "pixel_art.html", "output HTML file path")
+	convertCmd.Flags().StringVarP(&flagOutput, "output", "o", "go_pixel_art.html", "output HTML file path")
 	convertCmd.Flags().BoolVar(&flagNoHTML, "no-html", false, "output only the <table>, omit the HTML wrapper")
 	convertCmd.Flags().StringVarP(&flagTitle, "title", "t", "Go Pixel Art", "title for the HTML page")
+	convertCmd.Flags().BoolVar(&flagSmoothLoad, "smooth-load", false, "hide content until fully loaded to prevent progressive rendering")
 
 	rootCmd.AddCommand(convertCmd)
 }
@@ -54,6 +56,7 @@ func runConvert(_ *cobra.Command, args []string) error {
 			pixcel.WithTargetWidth(flagWidth),
 			pixcel.WithTargetHeight(flagHeight),
 			pixcel.WithHTMLWrapper(!flagNoHTML, flagTitle),
+			pixcel.WithSmoothLoad(flagSmoothLoad),
 		)
 
 		outFile, err := os.Create(flagOutput)
@@ -81,6 +84,7 @@ func runConvert(_ *cobra.Command, args []string) error {
 		pixcel.WithTargetWidth(flagWidth),
 		pixcel.WithTargetHeight(flagHeight),
 		pixcel.WithHTMLWrapper(!flagNoHTML, flagTitle),
+		pixcel.WithSmoothLoad(flagSmoothLoad),
 	)
 
 	outFile, err := os.Create(flagOutput)
