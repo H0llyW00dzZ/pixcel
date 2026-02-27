@@ -14,3 +14,10 @@ import (
 var pixelArtTemplate string
 
 var tmpl = template.Must(template.New("pixelart").Parse(pixelArtTemplate))
+
+//go:embed template_gif.go.tmpl
+var gifTemplate string
+
+var gifTmpl = template.Must(template.New("gifart").Funcs(template.FuncMap{
+	"inc": func(i int) int { return i + 1 },
+}).Parse(gifTemplate))
