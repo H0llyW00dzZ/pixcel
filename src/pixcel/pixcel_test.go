@@ -156,7 +156,7 @@ func TestNew_Defaults(t *testing.T) {
 	c := New()
 	assert.Equal(t, 56, c.targetWidth)
 	assert.True(t, c.withHTML)
-	assert.Equal(t, "Pixel Art", c.htmlTitle)
+	assert.Equal(t, "Go Pixel Art", c.htmlTitle)
 }
 
 func TestWithTargetWidth_Zero(t *testing.T) {
@@ -171,7 +171,7 @@ func TestWithTargetWidth_Negative(t *testing.T) {
 
 func TestWithHTMLWrapper_EmptyTitle(t *testing.T) {
 	c := New(WithHTMLWrapper(true, ""))
-	assert.Equal(t, "Pixel Art", c.htmlTitle, "empty title should keep default")
+	assert.Equal(t, "Go Pixel Art", c.htmlTitle, "empty title should keep default")
 }
 
 func TestWithHTMLWrapper_CustomTitle(t *testing.T) {
