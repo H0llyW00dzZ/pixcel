@@ -44,6 +44,8 @@ func WithTargetHeight(h int) Option {
 // the page is fully loaded, then reveals it with a smooth transition.
 // This prevents the "drawing animation" caused by progressive rendering of
 // large pixel-art tables. When enabled, a small inline script is added.
+//
+// This option only takes effect when [WithHTMLWrapper] is enabled.
 func WithSmoothLoad(enabled bool) Option {
 	return func(c *Converter) {
 		c.smoothLoad = enabled
