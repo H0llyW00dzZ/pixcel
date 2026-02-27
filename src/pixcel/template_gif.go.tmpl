@@ -1,0 +1,78 @@
+{{/*
+  Copyright (c) 2026 H0llyW00dzZ All rights reserved.
+
+  By accessing or using this software, you agree to be bound by the terms
+  of the License Agreement, which you can find at LICENSE files.
+
+  template_gif.go.tmpl — Animated GIF pixel art output template.
+  This template is embedded at compile time via go:embed.
+  Uses pure CSS @keyframes to animate frames — no JavaScript required.
+*/}}
+{{- if .WithHTML -}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="pixcel — github.com/H0llyW00dzZ/pixcel">
+<title>{{.Title}}</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .pixcel-container {
+    padding: 24px;
+    background: #16213e;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+  .pixcel-stage {
+    position: relative;
+    width: {{.Width}}px;
+    height: {{.Height}}px;
+  }
+  .pixcel-frame {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    animation: pixcel-anim {{.TotalDurationCSS}} step-end infinite;
+  }
+  {{- range $i, $f := .Frames}}
+  .pixcel-frame:nth-child({{inc $i}}) { animation-delay: {{$f.DelayCSS}}; }
+  {{- end}}
+  @keyframes pixcel-anim {
+    {{- range .Keyframes}}
+    {{.Percent}} { opacity: {{.Opacity}}; }
+    {{- end}}
+  }
+  table { border-collapse: collapse; font-size: 0; line-height: 0; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div class="pixcel-container">
+{{- end}}
+<div class="pixcel-stage"{{if not .WithHTML}} style="position:relative;width:{{.Width}}px;height:{{.Height}}px"{{end}}>
+{{- range .Frames}}
+<div class="pixcel-frame">
+<table width="{{$.Width}}" height="{{$.Height}}" cellpadding="0" cellspacing="0"{{if not $.WithHTML}} style="border-collapse:collapse;font-size:0;line-height:0"{{end}}>
+<tbody>
+{{- range .Rows}}
+<tr>{{range .}}<td{{if gt .Colspan 1}} colspan="{{.Colspan}}"{{end}} style="width:{{.Colspan}}px;height:1px" bgcolor="{{.Color}}"></td>{{end}}</tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+{{- end}}
+</div>
+{{- if .WithHTML}}
+</div>
+</body>
+</html>
+{{- end}}
