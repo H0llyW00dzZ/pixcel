@@ -20,6 +20,9 @@ go install github.com/H0llyW00dzZ/pixcel/cmd/pixcel@latest
 
 ### SDK
 
+> [!NOTE]
+> The SDK requires **Go 1.25.7** or later.
+
 ```bash
 go get github.com/H0llyW00dzZ/pixcel
 ```
