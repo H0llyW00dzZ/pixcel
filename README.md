@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="./logo_by_grok_4.20-beta.jpg" alt="PIXCEL Logo" width="500">
+  <br>
+  <i>Image By Grok 4.20 (beta)</i>
+</p>
+
 # pixcel
 
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.25.7-blue?logo=go)](https://go.dev/dl/)
