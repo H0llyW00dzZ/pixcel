@@ -89,7 +89,7 @@ func main() {
 | `WithTargetWidth` | `-W, --width` | `56` | Output width in table cells |
 | `WithTargetHeight` | `-H, --height` | proportional | Output height in table cells |
 | `WithHTMLWrapper` | `--no-html` | `true` | Include full HTML document wrapper |
-| — | `-t, --title` | `Pixel Art` | HTML page title |
+| — | `-t, --title` | `Go Pixel Art` | HTML page title |
 | — | `-o, --output` | `pixel_art.html` | Output file path |
 
 ## Project Structure

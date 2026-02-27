@@ -37,7 +37,7 @@ func init() {
 	convertCmd.Flags().IntVarP(&flagHeight, "height", "H", 0, "target height in table cells (default: proportional)")
 	convertCmd.Flags().StringVarP(&flagOutput, "output", "o", "pixel_art.html", "output HTML file path")
 	convertCmd.Flags().BoolVar(&flagNoHTML, "no-html", false, "output only the <table>, omit the HTML wrapper")
-	convertCmd.Flags().StringVarP(&flagTitle, "title", "t", "Pixel Art", "title for the HTML page")
+	convertCmd.Flags().StringVarP(&flagTitle, "title", "t", "Go Pixel Art", "title for the HTML page")
 
 	rootCmd.AddCommand(convertCmd)
 }

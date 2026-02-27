@@ -26,7 +26,7 @@ func New(opts ...Option) *Converter {
 	c := &Converter{
 		targetWidth: 56,
 		withHTML:    true,
-		htmlTitle:   "Pixel Art",
+		htmlTitle:   "Go Pixel Art",
 	}
 
 	for _, opt := range opts {

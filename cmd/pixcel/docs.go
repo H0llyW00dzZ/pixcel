@@ -25,7 +25,7 @@
 //   - -W, --width     target width in table cells (default: 56)
 //   - -H, --height    target height in table cells (default: proportional)
 //   - -o, --output    output HTML file path (default: pixel_art.html)
-//   - -t, --title     title for the HTML page (default: Pixel Art)
+//   - -t, --title     title for the HTML page (default: Go Pixel Art)
 //   - --no-html       output only the <table>, omit the HTML wrapper
 //
 // # SDK Usage
