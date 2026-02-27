@@ -1,9 +1,3 @@
-<p align="center">
-  <img src="./logo_by_grok_4.20-beta.jpg" alt="PIXCEL Logo" width="500">
-  <br>
-  <i>Image By Grok 4.20 (beta)</i>
-</p>
-
 # pixcel
 
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D1.25.7-blue?logo=go)](https://go.dev/dl/)
@@ -13,6 +7,12 @@
 [![codecov](https://codecov.io/gh/H0llyW00dzZ/pixcel/branch/master/graph/badge.svg?token=EZEFQ7RDQP)](https://codecov.io/gh/H0llyW00dzZ/pixcel)
 
 Convert images into HTML table-based pixel art.
+
+<p align="center">
+  <img src="./logo_by_grok_4.20-beta.jpg" alt="PIXCEL Logo" width="500">
+  <br>
+  <i>Image By Grok 4.20 (beta)</i>
+</p>
 
 **pixcel** is a Go SDK and CLI tool that transforms any PNG, JPEG, or GIF image into a self-contained HTML file using an optimised `<table>` layout with `colspan` merging for consecutive same-color cells.
 
