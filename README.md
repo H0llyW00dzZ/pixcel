@@ -4,6 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/H0llyW00dzZ/pixcel.svg)](https://pkg.go.dev/github.com/H0llyW00dzZ/pixcel)
 [![Go Report Card](https://goreportcard.com/badge/github.com/H0llyW00dzZ/pixcel)](https://goreportcard.com/report/github.com/H0llyW00dzZ/pixcel)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![codecov](https://codecov.io/gh/H0llyW00dzZ/pixcel/branch/master/graph/badge.svg?token=EZEFQ7RDQP)](https://codecov.io/gh/H0llyW00dzZ/pixcel)
 
 Convert images into HTML table-based pixel art.
 
