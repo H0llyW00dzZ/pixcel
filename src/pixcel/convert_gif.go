@@ -9,7 +9,6 @@ import (
 	"context"
 	_ "embed" // required for go:embed directive
 	"fmt"
-	"html/template"
 	"image"
 	"image/color"
 	"image/draw"
@@ -19,13 +18,6 @@ import (
 
 	xdraw "golang.org/x/image/draw"
 )
-
-//go:embed template_gif.go.tmpl
-var gifTemplate string
-
-var gifTmpl = template.Must(template.New("gifart").Funcs(template.FuncMap{
-	"inc": func(i int) int { return i + 1 },
-}).Parse(gifTemplate))
 
 // gifFrameData holds the rendered rows and animation delay for a single GIF frame.
 type gifFrameData struct {
