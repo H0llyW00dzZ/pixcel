@@ -126,13 +126,18 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 				continue
 			}
 
-			r8, g8, b8 := colorAt(img, x, y)
-			w := expandWidth(img, visited[y], x, y, width, r8, g8, b8)
-			h := expandHeight(img, x, y, w, height, r8, g8, b8)
+			r8, g8, b8, a8 := colorAt(img, x, y)
+			w := expandWidth(img, visited[y], x, y, width, r8, g8, b8, a8)
+			h := expandHeight(img, x, y, w, height, r8, g8, b8, a8)
 			markVisited(visited, x, y, w, h)
 
+			var cellColor string
+			if a8 >= 128 {
+				cellColor = formatColor(r8, g8, b8, obfuscate)
+			}
+
 			currentRow = append(currentRow, Cell{
-				Color:   formatColor(r8, g8, b8, obfuscate),
+				Color:   cellColor,
 				Colspan: w,
 				Rowspan: h,
 			})
@@ -143,19 +148,19 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 	return rows, nil
 }
 
-// colorAt returns the 8-bit RGB components of the pixel at (x, y).
-func colorAt(img image.Image, x, y int) (uint8, uint8, uint8) {
-	r, g, b, _ := img.At(x, y).RGBA()
-	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8)
+// colorAt returns the 8-bit RGBA components of the pixel at (x, y).
+func colorAt(img image.Image, x, y int) (uint8, uint8, uint8, uint8) {
+	r, g, b, a := img.At(x, y).RGBA()
+	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), uint8(a >> 8)
 }
 
 // expandWidth calculates the maximum horizontal span of consecutive pixels
-// matching the anchor color (r8, g8, b8) starting at column x on row y.
-func expandWidth(img image.Image, visitedRow []bool, x, y, width int, r8, g8, b8 uint8) int {
+// matching the anchor color (r8, g8, b8, a8) starting at column x on row y.
+func expandWidth(img image.Image, visitedRow []bool, x, y, width int, r8, g8, b8, a8 uint8) int {
 	w := 1
 	for x+w < width && !visitedRow[x+w] {
-		nr, ng, nb := colorAt(img, x+w, y)
-		if nr != r8 || ng != g8 || nb != b8 {
+		nr, ng, nb, na := colorAt(img, x+w, y)
+		if nr != r8 || ng != g8 || nb != b8 || na != a8 {
 			break
 		}
 		w++
@@ -165,10 +170,10 @@ func expandWidth(img image.Image, visitedRow []bool, x, y, width int, r8, g8, b8
 
 // expandHeight calculates how many rows below y share the exact same color strip
 // of width w starting at column x, without overlapping already-visited cells.
-func expandHeight(img image.Image, x, y, w, height int, r8, g8, b8 uint8) int {
+func expandHeight(img image.Image, x, y, w, height int, r8, g8, b8, a8 uint8) int {
 	h := 1
 	for y+h < height {
-		if !rowMatchesColor(img, x, y+h, w, r8, g8, b8) {
+		if !rowMatchesColor(img, x, y+h, w, r8, g8, b8, a8) {
 			break
 		}
 		h++
@@ -178,10 +183,10 @@ func expandHeight(img image.Image, x, y, w, height int, r8, g8, b8 uint8) int {
 
 // rowMatchesColor checks whether every pixel in the range [x, x+w) on the given
 // row at vertical position y matches the anchor color.
-func rowMatchesColor(img image.Image, x, y, w int, r8, g8, b8 uint8) bool {
+func rowMatchesColor(img image.Image, x, y, w int, r8, g8, b8, a8 uint8) bool {
 	for dx := range w {
-		nr, ng, nb := colorAt(img, x+dx, y)
-		if nr != r8 || ng != g8 || nb != b8 {
+		nr, ng, nb, na := colorAt(img, x+dx, y)
+		if nr != r8 || ng != g8 || nb != b8 || na != a8 {
 			return false
 		}
 	}
