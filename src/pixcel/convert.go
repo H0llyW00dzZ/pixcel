@@ -110,7 +110,7 @@ func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Ce
 
 	rows := make([][]Cell, height)
 
-	for y := 0; y < height; y++ {
+	for y := range height {
 		if y%10 == 0 {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -119,59 +119,16 @@ func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Ce
 
 		var currentRow []Cell
 
-		for x := 0; x < width; x++ {
+		for x := range width {
 			if visited[y][x] {
-				// The HTML table layout automatically pushes cells rightward if there
-				// is a rowspan from a row above protruding into this space, so we
-				// do not emit an empty placeholder cell here.
 				continue
 			}
 
-			// Capture the color of the current anchor pixel
-			r, g, b, _ := img.At(x, y).RGBA()
-			r8, g8, b8 := uint8(r>>8), uint8(g>>8), uint8(b>>8)
+			r8, g8, b8 := colorAt(img, x, y)
+			w := expandWidth(img, visited[y], x, y, width, r8, g8, b8)
+			h := expandHeight(img, visited, x, y, w, height, r8, g8, b8)
+			markVisited(visited, x, y, w, h)
 
-			// 1. Expand Horizontally (Colspan)
-			w := 1
-			for x+w < width && !visited[y][x+w] {
-				nr, ng, nb, _ := img.At(x+w, y).RGBA()
-				if uint8(nr>>8) == r8 && uint8(ng>>8) == g8 && uint8(nb>>8) == b8 {
-					w++
-				} else {
-					break
-				}
-			}
-
-			// 2. Expand Vertically (Rowspan)
-			// We can only increase height if *every* pixel in the new proposed row block
-			// (from x to x+w-1) perfectly matches the anchor color AND is unvisited.
-			h := 1
-			canExpand := true
-			for y+h < height && canExpand {
-				for dx := 0; dx < w; dx++ {
-					if visited[y+h][x+dx] {
-						canExpand = false
-						break
-					}
-					nr, ng, nb, _ := img.At(x+dx, y+h).RGBA()
-					if uint8(nr>>8) != r8 || uint8(ng>>8) != g8 || uint8(nb>>8) != b8 {
-						canExpand = false
-						break
-					}
-				}
-				if canExpand {
-					h++
-				}
-			}
-
-			// 3. Mark the discovered NxM block as visited
-			for dy := 0; dy < h; dy++ {
-				for dx := 0; dx < w; dx++ {
-					visited[y+dy][x+dx] = true
-				}
-			}
-
-			// 4. Emit the finalized Cell
 			currentRow = append(currentRow, Cell{
 				Color:   fmt.Sprintf("#%02x%02x%02x", r8, g8, b8),
 				Colspan: w,
@@ -182,4 +139,61 @@ func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Ce
 	}
 
 	return rows, nil
+}
+
+// colorAt returns the 8-bit RGB components of the pixel at (x, y).
+func colorAt(img image.Image, x, y int) (uint8, uint8, uint8) {
+	r, g, b, _ := img.At(x, y).RGBA()
+	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8)
+}
+
+// expandWidth calculates the maximum horizontal span of consecutive pixels
+// matching the anchor color (r8, g8, b8) starting at column x on row y.
+func expandWidth(img image.Image, visitedRow []bool, x, y, width int, r8, g8, b8 uint8) int {
+	w := 1
+	for x+w < width && !visitedRow[x+w] {
+		nr, ng, nb := colorAt(img, x+w, y)
+		if nr != r8 || ng != g8 || nb != b8 {
+			break
+		}
+		w++
+	}
+	return w
+}
+
+// expandHeight calculates how many rows below y share the exact same color strip
+// of width w starting at column x, without overlapping already-visited cells.
+func expandHeight(img image.Image, visited [][]bool, x, y, w, height int, r8, g8, b8 uint8) int {
+	h := 1
+	for y+h < height {
+		if !rowMatchesColor(img, visited[y+h], x, y+h, w, r8, g8, b8) {
+			break
+		}
+		h++
+	}
+	return h
+}
+
+// rowMatchesColor checks whether every pixel in the range [x, x+w) on the given
+// row at vertical position y matches the anchor color and is unvisited.
+func rowMatchesColor(img image.Image, visitedRow []bool, x, y, w int, r8, g8, b8 uint8) bool {
+	for dx := range w {
+		if visitedRow[x+dx] {
+			return false
+		}
+		nr, ng, nb := colorAt(img, x+dx, y)
+		if nr != r8 || ng != g8 || nb != b8 {
+			return false
+		}
+	}
+	return true
+}
+
+// markVisited flags all pixels in the rectangular block as visited.
+func markVisited(visited [][]bool, x, y, w, h int) {
+	for dy := range h {
+		for dx := range w {
+			visited[y+dy][x+dx] = true
+		}
+	}
 }
