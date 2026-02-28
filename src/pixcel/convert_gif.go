@@ -9,6 +9,7 @@ import (
 	"context"
 	_ "embed" // required for go:embed directive
 	"fmt"
+	"html"
 	"image"
 	"image/color"
 	"image/draw"
@@ -41,6 +42,7 @@ type gifTemplateData struct {
 	Frames           []gifFrameData
 	Keyframes        []gifKeyframe
 	SmoothLoad       bool
+	Obfuscate        bool
 }
 
 // ConvertGIF takes an animated GIF and writes animated HTML pixel art to the
@@ -124,7 +126,7 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 
 	data := &gifTemplateData{
 		WithHTML:         c.withHTML,
-		Title:            c.htmlTitle,
+		Title:            html.EscapeString(c.htmlTitle),
 		Width:            targetW,
 		Height:           targetH,
 		TotalDurationCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
@@ -194,7 +196,7 @@ func (c *Converter) buildRows(ctx context.Context, img image.Image) ([][]Cell, e
 	h := bounds.Max.Y
 	w := bounds.Max.X
 
-	return buildTable(ctx, img, w, h)
+	return buildTable(ctx, img, w, h, c.obfuscate)
 }
 
 // gifDelay returns the delay for frame i in seconds.

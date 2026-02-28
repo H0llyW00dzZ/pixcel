@@ -7,7 +7,7 @@ package pixcel
 
 import (
 	_ "embed" // required for go:embed directive
-	"html/template"
+	"text/template"
 )
 
 //go:embed template.go.tmpl

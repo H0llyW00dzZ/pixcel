@@ -70,6 +70,9 @@ pixcel convert art.png -W 600 -H 306 -o art.html --smooth-load
 
 # High-quality scaling (CatmullRom for photos/logos)
 pixcel convert photo.png -W 300 --scaler catmullrom -o photo.html
+
+# Generate bot-resistant HTML (randomized inline CSS for CAPTCHAs)
+pixcel convert noise.png -W 120 --obfuscate -o captcha.html
 ```
 
 ### SDK
@@ -96,8 +99,9 @@ func main() {
     converter := pixcel.New(
         pixcel.WithTargetWidth(64),
         pixcel.WithTargetHeight(32),            // optional: fixed height
-        pixcel.WithHTMLWrapper(true, "Art"),   // full HTML page with title
+        pixcel.WithHTMLWrapper(true, "Art"),    // full HTML page with title
         pixcel.WithSmoothLoad(true),            // optional: hide until loaded
+        pixcel.WithObfuscation(true),           // optional: randomize CSS formats
     )
 
     // Convert and write to file
@@ -116,6 +120,7 @@ func main() {
 | `WithHTMLWrapper` | `--no-html` | `true` | Include full HTML document wrapper |
 | `WithSmoothLoad` | `--smooth-load` | `false` | Hide content until fully loaded to prevent progressive rendering |
 | `WithScaler` | `--scaler` | `nearest` | Scaling algorithm: `nearest`, `catmullrom`, `bilinear`, `approxbilinear` |
+| `WithObfuscation` | `--obfuscate` | `false` | Randomize inline CSS styling formats for CAPTCHA/scraping protection |
 | — | `-t, --title` | `Go Pixel Art` | HTML page title |
 | — | `-o, --output` | `go_pixel_art.html` | Output file path |
 

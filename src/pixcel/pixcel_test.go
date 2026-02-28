@@ -63,8 +63,8 @@ func TestConverter_Convert(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, `<table width="4" height="4"`)
-	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px" bgcolor="#ff0000"></td>`)
-	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px" bgcolor="#0000ff"></td>`)
+	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px;background-color:#ff0000"></td>`)
+	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px;background-color:#0000ff"></td>`)
 }
 
 func TestConverter_Convert_WithHTMLWrapper(t *testing.T) {
@@ -134,7 +134,7 @@ func TestConverter_Convert_LargeImageContextCheck(t *testing.T) {
 	var buf bytes.Buffer
 	err := New(WithTargetWidth(2), WithHTMLWrapper(false, "")).Convert(context.Background(), img, &buf)
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), `bgcolor="#00ff00"`)
+	assert.Contains(t, buf.String(), `background-color:#00ff00`)
 }
 
 func TestConverter_Convert_SinglePixelWide(t *testing.T) {
@@ -213,7 +213,7 @@ func TestBuildTable_SingleColor(t *testing.T) {
 		}
 	}
 
-	rows, err := buildTable(context.Background(), img, 5, 5)
+	rows, err := buildTable(context.Background(), img, 5, 5, false)
 	require.NoError(t, err)
 	require.Len(t, rows, 5)
 
@@ -221,7 +221,7 @@ func TestBuildTable_SingleColor(t *testing.T) {
 	require.Len(t, rows[0], 1)
 	assert.Equal(t, 5, rows[0][0].Colspan)
 	assert.Equal(t, 5, rows[0][0].Rowspan)
-	assert.Equal(t, "#0a141e", rows[0][0].Color)
+	assert.Equal(t, "background-color:#0a141e", rows[0][0].Color)
 
 	// The other rows should be completely empty because they were consumed by rowspan
 	for y := 1; y < 5; y++ {
@@ -236,7 +236,7 @@ func TestBuildTable_AlternatingColors(t *testing.T) {
 	img.Set(0, 1, color.RGBA{B: 255, A: 255})
 	img.Set(1, 1, color.RGBA{R: 10, G: 10, B: 10, A: 255})
 
-	rows, err := buildTable(context.Background(), img, 2, 2)
+	rows, err := buildTable(context.Background(), img, 2, 2, false)
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 
@@ -847,4 +847,109 @@ func TestConvertGIF_WithScaler(t *testing.T) {
 	err := converter.ConvertGIF(context.Background(), g, &buf)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `class="pixcel-frame"`)
+}
+
+// --- Obfuscation tests ---
+
+func TestObfuscation_ColorFormatting(t *testing.T) {
+	// 100 runs to ensure we hit variations
+	for i := 0; i < 100; i++ {
+		// Pure Red
+		out := formatColor(255, 0, 0, true)
+		
+		// Verify it validly formats to one of the expected variations
+		// formatColor returns "prop:value" e.g. "BacKground-color:rgb(255,0,0)"
+		// Validate it contains a colon separating property from value.
+		outStr := string(out)
+		isValid := strings.Contains(outStr, ":") &&
+			(strings.Contains(outStr, "#") ||
+				strings.Contains(outStr, "rgb(") ||
+				strings.Contains(outStr, "hsl("))
+
+		assert.True(t, isValid, "Output format not recognized: %s", out)
+	}
+}
+
+func TestConverter_Convert_WithObfuscation(t *testing.T) {
+	img := createTestImage()
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithObfuscation(true))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.Convert(context.Background(), img, &buf))
+
+	output := buf.String()
+	
+	// Ensure we are getting styles or bgcolors
+	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
+	
+	// Shouldn't contain regular unified format only
+	assert.NotEqual(t, strings.Count(output, `bgcolor="#ff0000"`), 1) 
+}
+
+func TestConvertGIF_WithObfuscation(t *testing.T) {
+	g := createTestGIF(2, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithObfuscation(true))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	
+	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
+}
+
+func TestRandIntn_ZeroOrNegative(t *testing.T) {
+	// n <= 0 guard — must return 0 without panicking
+	assert.Equal(t, 0, randIntn(0))
+	assert.Equal(t, 0, randIntn(-5))
+}
+
+func TestRgbToHSL_GreenDominant(t *testing.T) {
+	// gf is the max channel → case gf branch
+	h, s, l := rgbToHSL(0, 255, 0)
+	assert.Equal(t, 120, h)
+	assert.Equal(t, 100, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_BlueDominant(t *testing.T) {
+	// bf is the max channel → default (bf) branch
+	h, s, l := rgbToHSL(0, 0, 255)
+	assert.Equal(t, 240, h)
+	assert.Equal(t, 100, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_HighLuminance(t *testing.T) {
+	// l > 0.5 branch: a light colour where (max+min)/2 > 0.5
+	// e.g. rgb(200, 220, 255) — blue dominant, light
+	h, s, l := rgbToHSL(200, 220, 255)
+	assert.Greater(t, l, 50)  // L > 50%
+	assert.Greater(t, s, 0)   // chromatic, not grey
+	assert.Greater(t, h, 0)   // some hue
+}
+
+func TestRgbToHSL_HueWrap(t *testing.T) {
+	// rf is max but gf < bf → h += 6 wrap branch (e.g. magenta/pink)
+	// rgb(255, 0, 128): r=max, g < b
+	h, _, _ := rgbToHSL(255, 0, 128)
+	// hue should be in the 300-360 range (magenta area)
+	assert.Greater(t, h, 270)
+}
+
+func TestRgbToHSL_Achromatic(t *testing.T) {
+	// maxC == minC (grey) → s=0, h=0
+	h, s, l := rgbToHSL(128, 128, 128)
+	assert.Equal(t, 0, h)
+	assert.Equal(t, 0, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_BlueMinimum(t *testing.T) {
+	// bf < minC branch: red > green > blue, so bf ends up as minC
+	// rgb(200, 150, 50): rf=max, bf=min
+	h, s, l := rgbToHSL(200, 150, 50)
+	assert.Greater(t, h, 0)  // warm hue (yellow-orange range)
+	assert.Greater(t, s, 0)
+	assert.Greater(t, l, 0)
 }

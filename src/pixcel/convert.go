@@ -8,7 +8,7 @@ package pixcel
 import (
 	"context"
 	_ "embed" // required for go:embed directive
-	"fmt"
+	"html"
 	"image"
 	"io"
 	"math"
@@ -31,6 +31,7 @@ type templateData struct {
 	Height     int
 	Rows       [][]Cell
 	SmoothLoad bool
+	Obfuscate  bool
 }
 
 // generateHTML contains the core logic for scaling the image and building
@@ -85,24 +86,25 @@ func (c *Converter) buildTemplateData(ctx context.Context, img image.Image) (*te
 	targetW := bounds.Max.X
 	targetH := bounds.Max.Y
 
-	rows, err := buildTable(ctx, img, targetW, targetH)
+	rows, err := buildTable(ctx, img, targetW, targetH, c.obfuscate)
 	if err != nil {
 		return nil, err
 	}
 
 	return &templateData{
 		WithHTML:   c.withHTML,
-		Title:      c.htmlTitle,
+		Title:      html.EscapeString(c.htmlTitle),
 		Width:      targetW,
 		Height:     targetH,
 		Rows:       rows,
 		SmoothLoad: c.smoothLoad,
+		Obfuscate:  c.obfuscate,
 	}, nil
 }
 
 // buildTable applies a 2D greedy meshing algorithm to map the image into the fewest
 // possible HTML table cells by dynamically calculating both colspan and rowspan.
-func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Cell, error) {
+func buildTable(ctx context.Context, img image.Image, width, height int, obfuscate bool) ([][]Cell, error) {
 	visited := make([][]bool, height)
 	for i := range visited {
 		visited[i] = make([]bool, width)
@@ -130,7 +132,7 @@ func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Ce
 			markVisited(visited, x, y, w, h)
 
 			currentRow = append(currentRow, Cell{
-				Color:   fmt.Sprintf("#%02x%02x%02x", r8, g8, b8),
+				Color:   formatColor(r8, g8, b8, obfuscate),
 				Colspan: w,
 				Rowspan: h,
 			})
