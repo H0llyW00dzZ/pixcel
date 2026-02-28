@@ -9,6 +9,8 @@ import (
 	"context"
 	"image"
 	"io"
+
+	"golang.org/x/image/draw"
 )
 
 // Converter is the main client for converting an image to HTML pixel art.
@@ -19,6 +21,7 @@ type Converter struct {
 	withHTML     bool
 	htmlTitle    string
 	smoothLoad   bool
+	scaler       draw.Scaler
 }
 
 // New creates a new Converter with the provided options.
@@ -28,6 +31,7 @@ func New(opts ...Option) *Converter {
 		targetWidth: 56,
 		withHTML:    true,
 		htmlTitle:   "Go Pixel Art",
+		scaler:     draw.NearestNeighbor,
 	}
 
 	for _, opt := range opts {

@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	xdraw "golang.org/x/image/draw"
 )
 
 func createTestImage() image.Image {
@@ -801,4 +802,49 @@ func TestConvertGIF_WithoutSmoothLoad(t *testing.T) {
 	output := buf.String()
 	assert.NotContains(t, output, "visibility: hidden")
 	assert.NotContains(t, output, `<script>`)
+}
+
+// --- Scaler tests ---
+
+func TestWithScaler_Default(t *testing.T) {
+	c := New()
+	assert.NotNil(t, c.scaler, "default scaler should not be nil")
+}
+
+func TestWithScaler_CatmullRom(t *testing.T) {
+	c := New(WithScaler(xdraw.CatmullRom))
+	assert.NotNil(t, c.scaler)
+}
+
+func TestWithScaler_Nil(t *testing.T) {
+	c := New(WithScaler(nil))
+	assert.NotNil(t, c.scaler, "nil scaler should be ignored, keeping default")
+}
+
+func TestConverter_Convert_WithScaler(t *testing.T) {
+	img := createTestImage()
+	converter := New(
+		WithTargetWidth(4),
+		WithHTMLWrapper(false, ""),
+		WithScaler(xdraw.CatmullRom),
+	)
+	var buf bytes.Buffer
+
+	err := converter.Convert(context.Background(), img, &buf)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `<table`)
+}
+
+func TestConvertGIF_WithScaler(t *testing.T) {
+	g := createTestGIF(2, 10)
+	converter := New(
+		WithTargetWidth(4),
+		WithHTMLWrapper(false, ""),
+		WithScaler(xdraw.BiLinear),
+	)
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `class="pixcel-frame"`)
 }

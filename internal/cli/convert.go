@@ -9,9 +9,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/H0llyW00dzZ/pixcel/src/pixcel"
 	"github.com/spf13/cobra"
+	"golang.org/x/image/draw"
 )
 
 // convertCmd flag values, scoped to this file.
@@ -22,6 +24,7 @@ var (
 	flagNoHTML     bool
 	flagTitle      string
 	flagSmoothLoad bool
+	flagScaler     string
 )
 
 // convertCmd converts an image file to HTML pixel art.
@@ -40,6 +43,7 @@ func init() {
 	convertCmd.Flags().BoolVar(&flagNoHTML, "no-html", false, "output only the <table>, omit the HTML wrapper")
 	convertCmd.Flags().StringVarP(&flagTitle, "title", "t", "Go Pixel Art", "title for the HTML page")
 	convertCmd.Flags().BoolVar(&flagSmoothLoad, "smooth-load", false, "hide content until fully loaded to prevent progressive rendering")
+	convertCmd.Flags().StringVar(&flagScaler, "scaler", "nearest", "scaling algorithm: nearest, catmullrom, bilinear, approxbilinear")
 
 	rootCmd.AddCommand(convertCmd)
 }
@@ -57,6 +61,7 @@ func runConvert(_ *cobra.Command, args []string) error {
 			pixcel.WithTargetHeight(flagHeight),
 			pixcel.WithHTMLWrapper(!flagNoHTML, flagTitle),
 			pixcel.WithSmoothLoad(flagSmoothLoad),
+			pixcel.WithScaler(parseScaler(flagScaler)),
 		)
 
 		outFile, err := os.Create(flagOutput)
@@ -85,6 +90,7 @@ func runConvert(_ *cobra.Command, args []string) error {
 		pixcel.WithTargetHeight(flagHeight),
 		pixcel.WithHTMLWrapper(!flagNoHTML, flagTitle),
 		pixcel.WithSmoothLoad(flagSmoothLoad),
+		pixcel.WithScaler(parseScaler(flagScaler)),
 	)
 
 	outFile, err := os.Create(flagOutput)
@@ -99,4 +105,18 @@ func runConvert(_ *cobra.Command, args []string) error {
 
 	fmt.Printf("Done! Saved HTML pixel art to %s\n", flagOutput)
 	return nil
+}
+
+// parseScaler maps a CLI flag string to a [draw.Scaler] implementation.
+func parseScaler(name string) draw.Scaler {
+	switch strings.ToLower(name) {
+	case "catmullrom":
+		return draw.CatmullRom
+	case "bilinear":
+		return draw.BiLinear
+	case "approxbilinear":
+		return draw.ApproxBiLinear
+	default:
+		return draw.NearestNeighbor
+	}
 }

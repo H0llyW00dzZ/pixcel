@@ -67,6 +67,9 @@ pixcel convert art.png -t "My Pixel Art" -o gallery.html
 
 # Smooth load (hides content until fully rendered)
 pixcel convert art.png -W 600 -H 306 -o art.html --smooth-load
+
+# High-quality scaling (CatmullRom for photos/logos)
+pixcel convert photo.png -W 300 --scaler catmullrom -o photo.html
 ```
 
 ### SDK
@@ -112,6 +115,7 @@ func main() {
 | `WithTargetHeight` | `-H, --height` | proportional | Output height in table cells |
 | `WithHTMLWrapper` | `--no-html` | `true` | Include full HTML document wrapper |
 | `WithSmoothLoad` | `--smooth-load` | `false` | Hide content until fully loaded to prevent progressive rendering |
+| `WithScaler` | `--scaler` | `nearest` | Scaling algorithm: `nearest`, `catmullrom`, `bilinear`, `approxbilinear` |
 | — | `-t, --title` | `Go Pixel Art` | HTML page title |
 | — | `-o, --output` | `go_pixel_art.html` | Output file path |
 

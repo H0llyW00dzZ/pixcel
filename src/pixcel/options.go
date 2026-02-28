@@ -5,6 +5,8 @@
 
 package pixcel
 
+import "golang.org/x/image/draw"
+
 // Option is a functional option for configuring the Converter.
 type Option func(*Converter)
 
@@ -49,5 +51,17 @@ func WithTargetHeight(h int) Option {
 func WithSmoothLoad(enabled bool) Option {
 	return func(c *Converter) {
 		c.smoothLoad = enabled
+	}
+}
+
+// WithScaler configures the image scaling algorithm used during conversion.
+// The default is [draw.NearestNeighbor], which preserves hard pixel edges.
+// For smoother downscaling of photos and logos, use [draw.CatmullRom] or
+// [draw.BiLinear].
+func WithScaler(s draw.Scaler) Option {
+	return func(c *Converter) {
+		if s != nil {
+			c.scaler = s
+		}
 	}
 }

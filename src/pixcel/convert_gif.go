@@ -184,7 +184,7 @@ func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
 // scaleToSize scales an image to the given target dimensions.
 func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) *image.RGBA {
 	destImg := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
-	xdraw.NearestNeighbor.Scale(destImg, destImg.Bounds(), img, img.Bounds(), xdraw.Over, nil)
+	c.scaler.Scale(destImg, destImg.Bounds(), img, img.Bounds(), xdraw.Over, nil)
 	return destImg
 }
 

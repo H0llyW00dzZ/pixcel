@@ -351,3 +351,46 @@ func TestExecute_ConvertAnimatedGIF(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "@keyframes pixcel-anim")
 }
+
+// --- Scaler CLI tests ---
+
+func TestParseScaler(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"nearest", "nearest"},
+		{"catmullrom", "catmullrom"},
+		{"bilinear", "bilinear"},
+		{"approxbilinear", "approxbilinear"},
+		{"unknown", "nearest"}, // default fallback
+	}
+	for _, tt := range tests {
+		s := parseScaler(tt.input)
+		assert.NotNil(t, s, "parseScaler(%q) should not return nil", tt.input)
+	}
+}
+
+func TestRunConvert_WithScaler(t *testing.T) {
+	dir := t.TempDir()
+	imgPath := filepath.Join(dir, "test.png")
+	createTestPNG(t, imgPath)
+	outPath := filepath.Join(dir, "scaler_output.html")
+
+	flagWidth = 4
+	flagHeight = 0
+	flagOutput = outPath
+	flagNoHTML = false
+	flagTitle = "Scaler Test"
+	flagSmoothLoad = false
+	flagScaler = "catmullrom"
+
+	require.NoError(t, runConvert(nil, []string{imgPath}))
+
+	data, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `<table`)
+
+	// Reset
+	flagScaler = "nearest"
+}
