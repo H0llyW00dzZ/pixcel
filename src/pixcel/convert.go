@@ -75,7 +75,7 @@ func (c *Converter) scaleImage(img image.Image) (image.Image, error) {
 	}
 
 	destImg := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
-	draw.NearestNeighbor.Scale(destImg, destImg.Bounds(), img, bounds, draw.Over, nil)
+	c.scaler.Scale(destImg, destImg.Bounds(), img, bounds, draw.Over, nil)
 	return destImg, nil
 }
 
