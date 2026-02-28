@@ -48,16 +48,15 @@
     top: 0;
     left: 0;
     opacity: 0;
-    animation: pixcel-anim {{.TotalDurationCSS}} step-end infinite;
   }
   {{- range $i, $f := .Frames}}
-  .pixcel-frame:nth-child({{inc $i}}) { animation-delay: {{$f.DelayCSS}}; }
-  {{- end}}
-  @keyframes pixcel-anim {
-    {{- range .Keyframes}}
+  .pixcel-frame:nth-child({{inc $i}}) { animation: pixcel-anim-{{$i}} {{$.TotalDurationCSS}} step-end infinite; }
+  @keyframes pixcel-anim-{{$i}} {
+    {{- range $f.Keyframes}}
     {{.Percent}} { opacity: {{.Opacity}}; }
     {{- end}}
   }
+  {{- end}}
   table { border-collapse: collapse; font-size: 0; line-height: 0; image-rendering: pixelated; }
 </style>
 </head>

@@ -20,10 +20,10 @@ import (
 	xdraw "golang.org/x/image/draw"
 )
 
-// gifFrameData holds the rendered rows and animation delay for a single GIF frame.
+// gifFrameData holds the rendered rows and animation keyframes for a single GIF frame.
 type gifFrameData struct {
-	Rows     [][]Cell
-	DelayCSS string // e.g. "0s", "0.1s"
+	Rows      [][]Cell
+	Keyframes []gifKeyframe
 }
 
 // gifKeyframe represents a single step in the CSS @keyframes rule.
@@ -40,7 +40,6 @@ type gifTemplateData struct {
 	Height           int
 	TotalDurationCSS string
 	Frames           []gifFrameData
-	Keyframes        []gifKeyframe
 	SmoothLoad       bool
 	Obfuscate        bool
 }
@@ -92,6 +91,9 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		}
 	}
 
+	// Build CSS keyframes for all frames.
+	allKeyframes := buildAllKeyframes(len(composited), g)
+
 	// Build frame data.
 	frames := make([]gifFrameData, 0, len(composited))
 	var cumulativeDelay float64
@@ -105,7 +107,6 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 
 		scaled := c.scaleToSize(img, targetW, targetH)
 
-
 		rows, err := c.buildRows(ctx, scaled)
 		if err != nil {
 			return err
@@ -114,15 +115,12 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		delay := gifDelay(g, i)
 
 		frames = append(frames, gifFrameData{
-			Rows:     rows,
-			DelayCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
+			Rows:      rows,
+			Keyframes: allKeyframes[i],
 		})
 
 		cumulativeDelay += delay
 	}
-
-	// Build CSS keyframes.
-	keyframes := buildKeyframes(len(frames), g)
 
 	data := &gifTemplateData{
 		WithHTML:         c.withHTML,
@@ -131,7 +129,6 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		Height:           targetH,
 		TotalDurationCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
 		Frames:           frames,
-		Keyframes:        keyframes,
 		SmoothLoad:       c.smoothLoad,
 	}
 
@@ -209,9 +206,8 @@ func gifDelay(g *gif.GIF, i int) float64 {
 	return 0.1 // default 100ms
 }
 
-// buildKeyframes generates CSS @keyframes steps for the animation.
-// Each frame gets a "visible" window proportional to its delay in the total duration.
-func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
+// buildAllKeyframes generates absolute-timed CSS @keyframes for each frame.
+func buildAllKeyframes(frameCount int, g *gif.GIF) [][]gifKeyframe {
 	if frameCount == 0 {
 		return nil
 	}
@@ -222,7 +218,7 @@ func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
 		totalDelay += gifDelay(g, i)
 	}
 
-	var keyframes []gifKeyframe
+	var result [][]gifKeyframe
 	var cumulative float64
 
 	for i := range frameCount {
@@ -230,23 +226,27 @@ func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
 		delay := gifDelay(g, i)
 		offPct := (cumulative + delay) / totalDelay * 100
 
-		// Show frame at onPct, hide at offPct.
-		keyframes = append(keyframes,
-			gifKeyframe{Percent: fmt.Sprintf("%.4f%%", onPct), Opacity: 1},
-		)
-		if i < frameCount-1 {
-			keyframes = append(keyframes,
-				gifKeyframe{Percent: fmt.Sprintf("%.4f%%", offPct), Opacity: 0},
-			)
+		var keyframes []gifKeyframe
+
+		// Start hidden if not the very first frame to appear.
+		if onPct > 0 {
+			keyframes = append(keyframes, gifKeyframe{Percent: "0%", Opacity: 0})
 		}
 
+		// Show frame.
+		keyframes = append(keyframes, gifKeyframe{Percent: fmt.Sprintf("%.4f%%", onPct), Opacity: 1})
+
+		// Hide frame when its delay expires.
+		if offPct < 100 {
+			keyframes = append(keyframes, gifKeyframe{Percent: fmt.Sprintf("%.4f%%", offPct), Opacity: 0})
+		}
+
+		// End hidden.
+		keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 0})
+
+		result = append(result, keyframes)
 		cumulative += delay
 	}
 
-	// End at 100%.
-	keyframes = append(keyframes,
-		gifKeyframe{Percent: "100%", Opacity: 0},
-	)
-
-	return keyframes
+	return result
 }

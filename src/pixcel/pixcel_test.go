@@ -545,10 +545,12 @@ func TestConvertGIF_KeyframesTiming(t *testing.T) {
 	output := buf.String()
 	// Total duration = 0.2s
 	assert.Contains(t, output, "0.200s")
-	// First frame delay = 0s
-	assert.Contains(t, output, `animation-delay: 0.000s`)
-	// Second frame delay = 0.1s
-	assert.Contains(t, output, `animation-delay: 0.100s`)
+	// First frame animation
+	assert.Contains(t, output, `animation: pixcel-anim-0 0.200s`)
+	assert.Contains(t, output, `0.0000% { opacity: 1; }`)
+	// Second frame animation
+	assert.Contains(t, output, `animation: pixcel-anim-1 0.200s`)
+	assert.Contains(t, output, `50.0000% { opacity: 1; }`)
 }
 
 func TestConvertGIF_DisposalBackground(t *testing.T) {
@@ -708,7 +710,7 @@ func TestBuildRows_CancelledContext(t *testing.T) {
 
 func TestBuildKeyframes_ZeroFrames(t *testing.T) {
 	g := &gif.GIF{}
-	kf := buildKeyframes(0, g)
+	kf := buildAllKeyframes(0, g)
 	assert.Nil(t, kf)
 }
 
