@@ -175,7 +175,7 @@ func expandHeight(img image.Image, x, y, w, height int, r8, g8, b8 uint8) int {
 }
 
 // rowMatchesColor checks whether every pixel in the range [x, x+w) on the given
-// row at vertical position y matches the anchor color and is unvisited.
+// row at vertical position y matches the anchor color.
 func rowMatchesColor(img image.Image, x, y, w int, r8, g8, b8 uint8) bool {
 	for dx := range w {
 		nr, ng, nb := colorAt(img, x+dx, y)

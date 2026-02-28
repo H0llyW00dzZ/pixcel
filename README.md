@@ -26,7 +26,7 @@ Given an image matrix $I$ of dimensions $W \times H$, the algorithm finds maxima
 >
 > $$h = \max \lbrace \; m \geq 1 \mid \forall \; j \in [0, m), \; \forall \; k \in [0, w) : I(x_0+k, \; y_0+j) = c_0 \; \rbrace$$
 
-Each rectangle emits a single cell: `<td colspan="w" rowspan="h">`, achieving $O(W \times H)$ time complexity with up to **95%+ payload reduction** compared to naive pixel-per-cell output.
+Each rectangle emits a single cell: `<td colspan="w" rowspan="h">`, achieving $O(W \times H)$ amortised time complexity with up to **95%+ payload reduction** (for images with large uniform-colour regions) compared to naive pixel-per-cell output.
 
 ## Installation
 
