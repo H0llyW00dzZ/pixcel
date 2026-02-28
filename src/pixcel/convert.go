@@ -132,7 +132,7 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 			markVisited(visited, x, y, w, h)
 
 			var cellColor string
-			if a8 >= 128 {
+			if a8 > 0 {
 				cellColor = formatColor(r8, g8, b8, obfuscate)
 			}
 
@@ -149,9 +149,23 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 }
 
 // colorAt returns the 8-bit RGBA components of the pixel at (x, y).
+// Semi-transparent pixels are alpha-blended against white to produce
+// the final visible color, matching browser default background behavior.
 func colorAt(img image.Image, x, y int) (uint8, uint8, uint8, uint8) {
 	r, g, b, a := img.At(x, y).RGBA()
-	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), uint8(a >> 8)
+	a8 := uint8(a >> 8)
+	if a8 == 0 {
+		return 0, 0, 0, 0
+	}
+	if a8 == 255 {
+		return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), 255
+	}
+	// Blend against white: out = src * alpha + white * (1 - alpha)
+	fa := float64(a8) / 255.0
+	r8 := uint8(float64(r>>8)*fa + 255*(1-fa))
+	g8 := uint8(float64(g>>8)*fa + 255*(1-fa))
+	b8 := uint8(float64(b>>8)*fa + 255*(1-fa))
+	return r8, g8, b8, a8
 }
 
 // expandWidth calculates the maximum horizontal span of consecutive pixels
