@@ -6,7 +6,7 @@
 package pixcel
 
 // Version is the current SDK version.
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 // GetVersion returns the current SDK version string.
 func GetVersion() string {
