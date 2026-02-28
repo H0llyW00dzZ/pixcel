@@ -47,7 +47,7 @@
 <table width="{{.Width}}" height="{{.Height}}" cellpadding="0" cellspacing="0"{{if not .WithHTML}} style="border-collapse:collapse;font-size:0;line-height:0"{{end}}>
 <tbody>
 {{- range .Rows}}
-<tr>{{range .}}<td{{if gt .Colspan 1}} colspan="{{.Colspan}}"{{end}}{{if gt .Rowspan 1}} rowspan="{{.Rowspan}}"{{end}} style="width:{{.Colspan}}px;height:{{.Rowspan}}px" bgcolor="{{.Color}}"></td>{{end}}</tr>
+<tr>{{range .}}<td{{if gt .Colspan 1}} colspan="{{.Colspan}}"{{end}}{{if gt .Rowspan 1}} rowspan="{{.Rowspan}}"{{end}} style="width:{{.Colspan}}px;height:{{.Rowspan}}px;{{.Color}}"></td>{{end}}</tr>
 {{- end}}
 </tbody>
 </table>

@@ -29,6 +29,8 @@
 //   - -t, --title       title for the HTML page (default: Go Pixel Art)
 //   - --no-html         output only the <table>, omit the HTML wrapper
 //   - --smooth-load     hide content until fully loaded to prevent progressive rendering
+//   - --scaler          scaling algorithm: nearest, catmullrom, bilinear, approxbilinear (default: nearest)
+//   - --obfuscate       randomize inline CSS styling for CAPTCHA/scraping protection (browser only)
 //
 // # SDK Usage
 //
@@ -41,6 +43,8 @@
 //	converter := pixcel.New(
 //	    pixcel.WithTargetWidth(64),
 //	    pixcel.WithTargetHeight(32),
+//	    pixcel.WithScaler(xdraw.CatmullRom),  // high-quality scaling
+//	    pixcel.WithObfuscation(true),         // browser-only: randomise CSS formats
 //	)
 //	err := converter.Convert(ctx, img, os.Stdout)
 package main

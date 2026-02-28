@@ -21,6 +21,7 @@ type Converter struct {
 	withHTML     bool
 	htmlTitle    string
 	smoothLoad   bool
+	obfuscate    bool
 	scaler       draw.Scaler
 }
 

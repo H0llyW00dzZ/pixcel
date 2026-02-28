@@ -22,4 +22,6 @@
 //   - [WithTargetHeight] sets the output height in table cells (default: proportional).
 //   - [WithHTMLWrapper] toggles the full HTML document wrapper (default: on).
 //   - [WithSmoothLoad] hides content until fully loaded to prevent progressive rendering (default: off).
+//   - [WithScaler] sets the image scaling algorithm: NearestNeighbor, CatmullRom, BiLinear, ApproxBiLinear (default: NearestNeighbor).
+//   - [WithObfuscation] randomises inline CSS color formats (hex/rgb/hsl) and property-name casing for bot resistance (default: off; browser use only).
 package pixcel

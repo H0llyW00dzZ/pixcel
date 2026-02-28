@@ -65,3 +65,13 @@ func WithScaler(s draw.Scaler) Option {
 		}
 	}
 }
+
+// WithObfuscation controls whether the generated HTML table uses randomized
+// inline CSS styling formats (hex, rgb, hsl, shorthand, random casing) for
+// each cell. This preserves the visual output exactly while making the
+// underlying HTML source code highly resistant to automated scraping (The Nightmare Scenario for Bots or AI).
+func WithObfuscation(enabled bool) Option {
+	return func(c *Converter) {
+		c.obfuscate = enabled
+	}
+}
