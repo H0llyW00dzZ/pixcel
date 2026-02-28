@@ -67,9 +67,16 @@ func WithScaler(s draw.Scaler) Option {
 }
 
 // WithObfuscation controls whether the generated HTML table uses randomized
-// inline CSS styling formats (hex, rgb, hsl, shorthand, random casing) for
-// each cell. This preserves the visual output exactly while making the
-// underlying HTML source code highly resistant to automated scraping (The Nightmare Scenario for Bots or AI).
+// inline CSS styling formats (hex lower/upper/mixed-case, rgb(), hsl()) and
+// randomized background-color property-name casing for each cell. This
+// preserves the visual output exactly while making the underlying HTML source
+// code highly resistant to automated scraping (The Nightmare Scenario for Bots or AI).
+//
+// Note: while a determined attacker can still bypass this by rendering the HTML
+// in a headless browser and running OCR on the screenshot, the attack cost is
+// significantly higher than against a plain image — a plain PNG CAPTCHA can be
+// read by a vision AI in a single API call, whereas this approach requires a full
+// browser runtime, a render cycle, and a screenshot before OCR can even begin.
 func WithObfuscation(enabled bool) Option {
 	return func(c *Converter) {
 		c.obfuscate = enabled
