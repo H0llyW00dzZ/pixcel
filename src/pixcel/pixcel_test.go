@@ -547,10 +547,61 @@ func TestConvertGIF_KeyframesTiming(t *testing.T) {
 	assert.Contains(t, output, "0.200s")
 	// First frame animation
 	assert.Contains(t, output, `animation: pixcel-anim-0 0.200s`)
-	assert.Contains(t, output, `0.0000% { opacity: 1; }`)
+	assert.Contains(t, output, `0.0000% { visibility: visible; }`)
 	// Second frame animation
 	assert.Contains(t, output, `animation: pixcel-anim-1 0.200s`)
-	assert.Contains(t, output, `50.0000% { opacity: 1; }`)
+	assert.Contains(t, output, `50.0000% { visibility: visible; }`)
+}
+
+func TestConvertGIF_LastFrameVisibleAtEnd(t *testing.T) {
+	// With 3 frames, the last frame's keyframes should end at 100% with opacity 1
+	// to avoid a blank gap before the animation loops.
+	g := createTestGIF(3, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "Last Frame"))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	// The last frame (pixcel-anim-2) must end visible.
+	assert.Contains(t, output, `@keyframes pixcel-anim-2`)
+	// Non-last frames should still end hidden.
+	assert.Contains(t, output, `animation: pixcel-anim-0`)
+	assert.Contains(t, output, `animation: pixcel-anim-1`)
+}
+
+func TestBuildAllKeyframes_LastFrameEndsVisible(t *testing.T) {
+	g := createTestGIF(3, 10)
+	kfs := buildAllKeyframes(3, g)
+	require.Len(t, kfs, 3)
+
+	// First two frames should end at 100% with opacity 0.
+	lastKF0 := kfs[0][len(kfs[0])-1]
+	assert.Equal(t, "100%", lastKF0.Percent)
+	assert.Equal(t, 0, lastKF0.Opacity)
+
+	lastKF1 := kfs[1][len(kfs[1])-1]
+	assert.Equal(t, "100%", lastKF1.Percent)
+	assert.Equal(t, 0, lastKF1.Opacity)
+
+	// Last frame should end at 100% with opacity 1 (stays visible).
+	lastKF2 := kfs[2][len(kfs[2])-1]
+	assert.Equal(t, "100%", lastKF2.Percent)
+	assert.Equal(t, 1, lastKF2.Opacity)
+}
+
+func TestConvertGIF_FrameCSSSizing(t *testing.T) {
+	// Verify the CSS fixes: frames have width/height 100% and first child is visible.
+	g := createTestGIF(2, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "CSS Fix"))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	assert.Contains(t, output, "width: 100%")
+	assert.Contains(t, output, "height: 100%")
+	assert.Contains(t, output, ".pixcel-frame:first-child { visibility: visible; }")
 }
 
 func TestConvertGIF_DisposalBackground(t *testing.T) {
@@ -789,8 +840,8 @@ func TestConvertGIF_WithSmoothLoad(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	assert.Contains(t, output, "visibility: hidden")
-	assert.Contains(t, output, `.loaded`)
+	// SmoothLoad hides the container, not individual frames.
+	assert.Contains(t, output, `.pixcel-container.loaded`)
 	assert.Contains(t, output, `<script>`)
 }
 
@@ -802,7 +853,8 @@ func TestConvertGIF_WithoutSmoothLoad(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	assert.NotContains(t, output, "visibility: hidden")
+	// Without SmoothLoad, container should not have the loaded class or script.
+	assert.NotContains(t, output, `.pixcel-container.loaded`)
 	assert.NotContains(t, output, `<script>`)
 }
 
@@ -858,7 +910,7 @@ func TestObfuscation_ColorFormatting(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		// Pure Red, fully opaque
 		out := formatColor(255, 0, 0, 255, true)
-		
+
 		// Verify it validly formats to one of the expected variations
 		// formatColor returns "prop:value" e.g. "BacKground-color:rgba(255,0,0,1)"
 		// Validate it contains a colon separating property from value.
@@ -880,12 +932,12 @@ func TestConverter_Convert_WithObfuscation(t *testing.T) {
 	require.NoError(t, converter.Convert(context.Background(), img, &buf))
 
 	output := buf.String()
-	
+
 	// Ensure we are getting styles or bgcolors
 	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
-	
+
 	// Shouldn't contain regular unified format only
-	assert.NotEqual(t, strings.Count(output, `bgcolor="#ff0000"`), 1) 
+	assert.NotEqual(t, strings.Count(output, `bgcolor="#ff0000"`), 1)
 }
 
 func TestConvertGIF_WithObfuscation(t *testing.T) {
@@ -896,7 +948,7 @@ func TestConvertGIF_WithObfuscation(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	
+
 	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
 }
 
@@ -926,9 +978,9 @@ func TestRgbToHSL_HighLuminance(t *testing.T) {
 	// l > 0.5 branch: a light colour where (max+min)/2 > 0.5
 	// e.g. rgb(200, 220, 255) — blue dominant, light
 	h, s, l := rgbToHSL(200, 220, 255)
-	assert.Greater(t, l, 50)  // L > 50%
-	assert.Greater(t, s, 0)   // chromatic, not grey
-	assert.Greater(t, h, 0)   // some hue
+	assert.Greater(t, l, 50) // L > 50%
+	assert.Greater(t, s, 0)  // chromatic, not grey
+	assert.Greater(t, h, 0)  // some hue
 }
 
 func TestRgbToHSL_HueWrap(t *testing.T) {
@@ -951,7 +1003,7 @@ func TestRgbToHSL_BlueMinimum(t *testing.T) {
 	// bf < minC branch: red > green > blue, so bf ends up as minC
 	// rgb(200, 150, 50): rf=max, bf=min
 	h, s, l := rgbToHSL(200, 150, 50)
-	assert.Greater(t, h, 0)  // warm hue (yellow-orange range)
+	assert.Greater(t, h, 0) // warm hue (yellow-orange range)
 	assert.Greater(t, s, 0)
 	assert.Greater(t, l, 0)
 }

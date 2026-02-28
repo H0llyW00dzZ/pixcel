@@ -241,8 +241,12 @@ func buildAllKeyframes(frameCount int, g *gif.GIF) [][]gifKeyframe {
 			keyframes = append(keyframes, gifKeyframe{Percent: fmt.Sprintf("%.4f%%", offPct), Opacity: 0})
 		}
 
-		// End hidden.
-		keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 0})
+		// End: last frame stays visible until the loop restarts; others hide.
+		if i == frameCount-1 {
+			keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 1})
+		} else {
+			keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 0})
+		}
 
 		result = append(result, keyframes)
 		cumulative += delay

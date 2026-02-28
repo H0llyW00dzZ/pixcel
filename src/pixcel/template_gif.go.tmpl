@@ -42,18 +42,22 @@
     position: relative;
     width: {{.Width}}px;
     height: {{.Height}}px;
+    overflow: hidden;
   }
   .pixcel-frame {
     position: absolute;
     top: 0;
     left: 0;
-    opacity: 0;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
   }
+  .pixcel-frame:first-child { visibility: visible; }
   {{- range $i, $f := .Frames}}
   .pixcel-frame:nth-child({{inc $i}}) { animation: pixcel-anim-{{$i}} {{$.TotalDurationCSS}} step-end infinite; }
   @keyframes pixcel-anim-{{$i}} {
     {{- range $f.Keyframes}}
-    {{.Percent}} { opacity: {{.Opacity}}; }
+    {{.Percent}} { visibility: {{if eq .Opacity 1}}visible{{else}}hidden{{end}}; }
     {{- end}}
   }
   {{- end}}
