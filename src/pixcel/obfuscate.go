@@ -28,10 +28,9 @@ func randIntn(n int) int {
 // "#ff0000") suitable for use inside a background-color CSS property.
 //
 // When obfuscate is true it randomly picks from several CSS color notations
-// — hex (lower/upper/mixed-case nibbles), rgb(), rgb(%), and hsl() — and
-// also randomises the property name casing (background-color vs background)
-// in the property part. Since we switched the template engine to text/template,
-// none of these formats are sanitised or blocked by the renderer.
+// — hex (lower/upper/mixed-case nibbles), rgb(), and hsl() — and also
+// randomises the casing of the background-color property name. Since we use
+// text/template, none of these formats are sanitised or blocked by the renderer.
 func formatColor(r, g, b uint8, obfuscate bool) string {
 	if !obfuscate {
 		return fmt.Sprintf("background-color:#%02x%02x%02x", r, g, b)

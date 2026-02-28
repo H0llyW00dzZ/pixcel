@@ -897,3 +897,59 @@ func TestConvertGIF_WithObfuscation(t *testing.T) {
 	
 	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
 }
+
+func TestRandIntn_ZeroOrNegative(t *testing.T) {
+	// n <= 0 guard — must return 0 without panicking
+	assert.Equal(t, 0, randIntn(0))
+	assert.Equal(t, 0, randIntn(-5))
+}
+
+func TestRgbToHSL_GreenDominant(t *testing.T) {
+	// gf is the max channel → case gf branch
+	h, s, l := rgbToHSL(0, 255, 0)
+	assert.Equal(t, 120, h)
+	assert.Equal(t, 100, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_BlueDominant(t *testing.T) {
+	// bf is the max channel → default (bf) branch
+	h, s, l := rgbToHSL(0, 0, 255)
+	assert.Equal(t, 240, h)
+	assert.Equal(t, 100, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_HighLuminance(t *testing.T) {
+	// l > 0.5 branch: a light colour where (max+min)/2 > 0.5
+	// e.g. rgb(200, 220, 255) — blue dominant, light
+	h, s, l := rgbToHSL(200, 220, 255)
+	assert.Greater(t, l, 50)  // L > 50%
+	assert.Greater(t, s, 0)   // chromatic, not grey
+	assert.Greater(t, h, 0)   // some hue
+}
+
+func TestRgbToHSL_HueWrap(t *testing.T) {
+	// rf is max but gf < bf → h += 6 wrap branch (e.g. magenta/pink)
+	// rgb(255, 0, 128): r=max, g < b
+	h, _, _ := rgbToHSL(255, 0, 128)
+	// hue should be in the 300-360 range (magenta area)
+	assert.Greater(t, h, 270)
+}
+
+func TestRgbToHSL_Achromatic(t *testing.T) {
+	// maxC == minC (grey) → s=0, h=0
+	h, s, l := rgbToHSL(128, 128, 128)
+	assert.Equal(t, 0, h)
+	assert.Equal(t, 0, s)
+	assert.Equal(t, 50, l)
+}
+
+func TestRgbToHSL_BlueMinimum(t *testing.T) {
+	// bf < minC branch: red > green > blue, so bf ends up as minC
+	// rgb(200, 150, 50): rf=max, bf=min
+	h, s, l := rgbToHSL(200, 150, 50)
+	assert.Greater(t, h, 0)  // warm hue (yellow-orange range)
+	assert.Greater(t, s, 0)
+	assert.Greater(t, l, 0)
+}
