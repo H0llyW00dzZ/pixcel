@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -91,36 +92,19 @@ func randomizeCase(s string) string {
 
 // rgbToHSL converts 8-bit RGB values to HSL (H: 0-360, S: 0-100, L: 0-100).
 func rgbToHSL(r, g, b uint8) (int, int, int) {
-	rf := float64(r) / 255
-	gf := float64(g) / 255
-	bf := float64(b) / 255
+	rf, gf, bf := float64(r)/255, float64(g)/255, float64(b)/255
 
-	maxC := rf
-	if gf > maxC {
-		maxC = gf
-	}
-	if bf > maxC {
-		maxC = bf
-	}
+	maxC := math.Max(rf, math.Max(gf, bf))
+	minC := math.Min(rf, math.Min(gf, bf))
+	l := (maxC + minC) / 2
+	h, s := 0.0, 0.0
 
-	minC := rf
-	if gf < minC {
-		minC = gf
-	}
-	if bf < minC {
-		minC = bf
-	}
-
-	h, s, l := 0.0, 0.0, (maxC+minC)/2
-
-	if maxC != minC {
-		d := maxC - minC
+	if d := maxC - minC; d != 0 {
 		if l > 0.5 {
 			s = d / (2.0 - maxC - minC)
 		} else {
 			s = d / (maxC + minC)
 		}
-
 		switch maxC {
 		case rf:
 			h = (gf - bf) / d
