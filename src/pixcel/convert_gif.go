@@ -101,10 +101,8 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 			}
 		}
 
-		scaled, err := c.scaleToSize(img, targetW, targetH)
-		if err != nil {
-			return err
-		}
+		scaled := c.scaleToSize(img, targetW, targetH)
+
 
 		rows, err := c.buildRows(ctx, scaled)
 		if err != nil {
@@ -184,28 +182,19 @@ func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
 }
 
 // scaleToSize scales an image to the given target dimensions.
-func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) (image.Image, error) {
+func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) *image.RGBA {
 	destImg := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
 	xdraw.NearestNeighbor.Scale(destImg, destImg.Bounds(), img, img.Bounds(), xdraw.Over, nil)
-	return destImg, nil
+	return destImg
 }
 
-// buildRows creates the cell rows from a scaled image, checking context periodically.
+// buildRows creates the cell rows from a scaled image via 2D meshing.
 func (c *Converter) buildRows(ctx context.Context, img image.Image) ([][]Cell, error) {
 	bounds := img.Bounds()
 	h := bounds.Max.Y
 	w := bounds.Max.X
 
-	rows := make([][]Cell, 0, h)
-	for y := range h {
-		if y%10 == 0 {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-		}
-		rows = append(rows, buildRow(img, y, w))
-	}
-	return rows, nil
+	return buildTable(ctx, img, w, h)
 }
 
 // gifDelay returns the delay for frame i in seconds.
