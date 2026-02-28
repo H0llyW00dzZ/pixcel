@@ -30,13 +30,12 @@
     padding: 24px;
     background: #16213e;
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 {{- if .SmoothLoad}}
-    visibility: hidden;
-{{- end}}
+    opacity: 0; transition: opacity 0.4s ease;{{- end}}
   }
 {{- if .SmoothLoad}}
-  .pixcel-container.loaded { visibility: visible; }
+  .pixcel-container.loaded { opacity: 1; }
 {{- end}}
   .pixcel-stage {
     position: relative;
@@ -50,14 +49,14 @@
     left: 0;
     width: 100%;
     height: 100%;
-    visibility: hidden;
+    opacity: 0;
   }
-  .pixcel-frame:first-child { visibility: visible; }
+  .pixcel-frame:first-child { opacity: 1; }
   {{- range $i, $f := .Frames}}
   .pixcel-frame:nth-child({{inc $i}}) { animation: pixcel-anim-{{$i}} {{$.TotalDurationCSS}} step-end infinite; }
   @keyframes pixcel-anim-{{$i}} {
     {{- range $f.Keyframes}}
-    {{.Percent}} { visibility: {{if eq .Opacity 1}}visible{{else}}hidden{{end}}; }
+    {{.Percent}} { opacity: {{.Opacity}}; }
     {{- end}}
   }
   {{- end}}
@@ -70,7 +69,7 @@
 <div class="pixcel-stage"{{if not .WithHTML}} style="position:relative;width:{{.Width}}px;height:{{.Height}}px"{{end}}>
 {{- range .Frames}}
 <div class="pixcel-frame">
-<table width="{{$.Width}}" height="{{$.Height}}" cellpadding="0" cellspacing="0"{{if not $.WithHTML}} style="border-collapse:collapse;font-size:0;line-height:0"{{end}}>
+<table width="{{$.Width}}" height="{{$.Height}}" style="border-collapse:collapse;font-size:0;line-height:0;image-rendering:pixelated">
 <tbody>
 {{- range .Rows}}
 <tr>{{range .}}<td{{if gt .Colspan 1}} colspan="{{.Colspan}}"{{end}}{{if gt .Rowspan 1}} rowspan="{{.Rowspan}}"{{end}}{{if .Color}} style="width:{{.Colspan}}px;height:{{.Rowspan}}px;{{.Color}}"{{end}}></td>{{end}}</tr>

@@ -29,7 +29,7 @@ type gifFrameData struct {
 // gifKeyframe represents a single step in the CSS @keyframes rule.
 type gifKeyframe struct {
 	Percent string
-	Opacity int
+	Opacity int // 0 or 1 (used for opacity animation)
 }
 
 // gifTemplateData holds all data injected into the animated GIF HTML template.
@@ -41,7 +41,7 @@ type gifTemplateData struct {
 	TotalDurationCSS string
 	Frames           []gifFrameData
 	SmoothLoad       bool
-	Obfuscate        bool
+	Obfuscate        bool // now properly set (for future template use if needed)
 }
 
 // ConvertGIF takes an animated GIF and writes animated HTML pixel art to the
@@ -96,7 +96,7 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 
 	// Build frame data.
 	frames := make([]gifFrameData, 0, len(composited))
-	var cumulativeDelay float64
+	var totalDuration float64
 
 	for i, img := range composited {
 		if i%5 == 0 {
@@ -119,7 +119,7 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 			Keyframes: allKeyframes[i],
 		})
 
-		cumulativeDelay += delay
+		totalDuration += delay
 	}
 
 	data := &gifTemplateData{
@@ -127,9 +127,10 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		Title:            html.EscapeString(c.htmlTitle),
 		Width:            targetW,
 		Height:           targetH,
-		TotalDurationCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
+		TotalDurationCSS: fmt.Sprintf("%.3fs", totalDuration),
 		Frames:           frames,
 		SmoothLoad:       c.smoothLoad,
+		Obfuscate:        c.obfuscate, // fixed
 	}
 
 	return gifTmpl.Execute(w, data)
@@ -138,42 +139,42 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 // compositeFrames renders each GIF frame onto a full-size canvas, handling
 // the GIF disposal method to produce complete images for each frame.
 func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
-	// Use the overall GIF dimensions as the canvas size.
-	canvasW := g.Config.Width
-	canvasH := g.Config.Height
-	if canvasW == 0 || canvasH == 0 {
-		// Fallback: use first frame bounds.
+	width, height := g.Config.Width, g.Config.Height
+	if width == 0 || height == 0 {
 		b := g.Image[0].Bounds()
-		canvasW = b.Max.X
-		canvasH = b.Max.Y
+		width, height = b.Dx(), b.Dy()
 	}
 
-	canvas := image.NewRGBA(image.Rect(0, 0, canvasW, canvasH))
+	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
 	result := make([]*image.RGBA, 0, len(g.Image))
 
+	var prevState *image.RGBA // for DisposalPrevious
+
 	for i, frame := range g.Image {
-		// Draw this frame onto the canvas.
+		// Apply disposal from PREVIOUS frame before drawing current (standard behavior)
+		if i > 0 && i-1 < len(g.Disposal) {
+			switch g.Disposal[i-1] {
+			case gif.DisposalBackground:
+				draw.Draw(canvas, frame.Bounds(), image.NewUniform(color.Transparent), image.Point{}, draw.Src)
+			case gif.DisposalPrevious:
+				if prevState != nil {
+					copy(canvas.Pix, prevState.Pix)
+				}
+			}
+		}
+
 		draw.Draw(canvas, frame.Bounds(), frame, frame.Bounds().Min, draw.Over)
 
-		// Snapshot the current canvas.
 		snapshot := image.NewRGBA(canvas.Bounds())
 		copy(snapshot.Pix, canvas.Pix)
 		result = append(result, snapshot)
 
-		// Handle disposal.
-		if i < len(g.Disposal) {
-			switch g.Disposal[i] {
-			case gif.DisposalBackground:
-				// Clear the frame area to transparent.
-				draw.Draw(canvas, frame.Bounds(),
-					image.NewUniform(color.Transparent), image.Point{}, draw.Src)
-			case gif.DisposalPrevious:
-				// Restore to previous frame (re-copy previous snapshot).
-				if i > 0 {
-					copy(canvas.Pix, result[i-1].Pix)
-				}
-			}
-			// DisposalNone (0) or default: leave canvas as-is.
+		// Save state for next DisposalPrevious
+		if i < len(g.Disposal) && g.Disposal[i] == gif.DisposalPrevious {
+			prevState = image.NewRGBA(canvas.Bounds())
+			copy(prevState.Pix, canvas.Pix)
+		} else {
+			prevState = nil
 		}
 	}
 

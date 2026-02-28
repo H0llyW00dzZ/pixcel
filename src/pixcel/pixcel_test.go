@@ -547,10 +547,10 @@ func TestConvertGIF_KeyframesTiming(t *testing.T) {
 	assert.Contains(t, output, "0.200s")
 	// First frame animation
 	assert.Contains(t, output, `animation: pixcel-anim-0 0.200s`)
-	assert.Contains(t, output, `0.0000% { visibility: visible; }`)
+	assert.Contains(t, output, `0.0000% { opacity: 1; }`)
 	// Second frame animation
 	assert.Contains(t, output, `animation: pixcel-anim-1 0.200s`)
-	assert.Contains(t, output, `50.0000% { visibility: visible; }`)
+	assert.Contains(t, output, `50.0000% { opacity: 1; }`)
 }
 
 func TestConvertGIF_LastFrameVisibleAtEnd(t *testing.T) {
@@ -601,7 +601,7 @@ func TestConvertGIF_FrameCSSSizing(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "width: 100%")
 	assert.Contains(t, output, "height: 100%")
-	assert.Contains(t, output, ".pixcel-frame:first-child { visibility: visible; }")
+	assert.Contains(t, output, ".pixcel-frame:first-child { opacity: 1; }")
 }
 
 func TestConvertGIF_DisposalBackground(t *testing.T) {
