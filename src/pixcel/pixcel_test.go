@@ -1077,3 +1077,115 @@ func TestSampleFrames_NoOp(t *testing.T) {
 	assert.Len(t, sampled, 5, "should not sample when under the limit")
 	assert.Same(t, g, sg, "GIF pointer should be unchanged")
 }
+
+// --- Coverage: clamp255 ---
+
+func TestClamp255_Above(t *testing.T) {
+	assert.Equal(t, 255.0, clamp255(300.0))
+}
+
+func TestClamp255_Below(t *testing.T) {
+	assert.Equal(t, 0.0, clamp255(-10.0))
+}
+
+func TestClamp255_InRange(t *testing.T) {
+	assert.Equal(t, 128.0, clamp255(128.0))
+}
+
+// --- Coverage: colorAt with transparent and semi-transparent pixels ---
+
+func TestColorAt_FullyTransparent(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 100, G: 200, B: 50, A: 0}) // fully transparent
+	r, g, b, a := colorAt(img, 0, 0)
+	assert.Equal(t, uint8(0), r)
+	assert.Equal(t, uint8(0), g)
+	assert.Equal(t, uint8(0), b)
+	assert.Equal(t, uint8(0), a)
+}
+
+func TestColorAt_SemiTransparent(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 200, G: 100, B: 50, A: 128})
+	r, g, b, a := colorAt(img, 0, 0)
+	assert.Equal(t, uint8(128), a)
+	// The un-premultiplied values should be close to the original.
+	assert.InDelta(t, 200, int(r), 2)
+	assert.InDelta(t, 100, int(g), 2)
+	assert.InDelta(t, 50, int(b), 2)
+}
+
+// --- Coverage: formatColor non-opaque without obfuscation ---
+
+func TestFormatColor_SemiTransparent_NoObfuscation(t *testing.T) {
+	out := formatColor(255, 0, 0, 128, false)
+	assert.Equal(t, "background-color:#ff000080", out)
+}
+
+// --- Coverage: generateGIFHTML edge cases ---
+
+func TestConvertGIF_ZeroDimensionComposited(t *testing.T) {
+	// GIF where composited frame has zero dimensions.
+	g := &gif.GIF{}
+	g.Config.Width = 0
+	g.Config.Height = 0
+	frame := image.NewPaletted(image.Rect(0, 0, 0, 0), color.Palette{color.Black})
+	g.Image = append(g.Image, frame, frame) // 2 frames to avoid single-frame fallback
+	g.Delay = append(g.Delay, 10, 10)
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	assert.ErrorIs(t, err, ErrInvalidDimensions)
+}
+
+func TestConvertGIF_TargetHZeroMultiFrame(t *testing.T) {
+	// Multi-frame GIF where proportional height rounds to 0, should clamp to 1.
+	g := &gif.GIF{}
+	g.Config.Width = 1000
+	g.Config.Height = 1
+	frame := image.NewPaletted(image.Rect(0, 0, 1000, 1), color.Palette{color.White})
+	for x := range 1000 {
+		frame.SetColorIndex(x, 0, 0)
+	}
+	g.Image = append(g.Image, frame, frame) // 2 frames
+	g.Delay = append(g.Delay, 10, 10)
+
+	converter := New(WithTargetWidth(10), WithHTMLWrapper(false, ""))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `height="1"`)
+}
+
+func TestConvertGIF_ContextCancel_InMultiFrameLoop(t *testing.T) {
+	// Cancel at exactly the i%5==0 context check inside the frame-processing loop.
+	// Call sequence: (1) entry check → ok, (2) i=0 i%5==0 check → cancel here.
+	g := createTestGIF(2, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 1, // pass entry, fail on the first i%5==0 check
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestConvertGIF_BuildRowsError_InMultiFrameLoop(t *testing.T) {
+	// Cancel at just the right time to trigger the buildRows error path.
+	g := createTestGIF(2, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 3, // pass initial + frame-loop checks, fail inside buildTable
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
