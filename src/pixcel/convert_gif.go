@@ -20,16 +20,16 @@ import (
 	xdraw "golang.org/x/image/draw"
 )
 
-// gifFrameData holds the rendered rows and animation delay for a single GIF frame.
+// gifFrameData holds the rendered rows and animation keyframes for a single GIF frame.
 type gifFrameData struct {
-	Rows     [][]Cell
-	DelayCSS string // e.g. "0s", "0.1s"
+	Rows      [][]Cell
+	Keyframes []gifKeyframe
 }
 
 // gifKeyframe represents a single step in the CSS @keyframes rule.
 type gifKeyframe struct {
 	Percent string
-	Opacity int
+	Opacity int // 0 or 1 (used for opacity animation)
 }
 
 // gifTemplateData holds all data injected into the animated GIF HTML template.
@@ -40,9 +40,8 @@ type gifTemplateData struct {
 	Height           int
 	TotalDurationCSS string
 	Frames           []gifFrameData
-	Keyframes        []gifKeyframe
 	SmoothLoad       bool
-	Obfuscate        bool
+	Obfuscate        bool // now properly set (for future template use if needed)
 }
 
 // ConvertGIF takes an animated GIF and writes animated HTML pixel art to the
@@ -74,6 +73,14 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 	// Composite all frames into full images (handling GIF disposal).
 	composited := c.compositeFrames(g)
 
+	// Sample frames if exceeding maxFrames budget.
+	composited, g = c.sampleFrames(composited, g)
+
+	// Single frame after sampling — delegate to the lighter static path.
+	if len(composited) == 1 {
+		return c.generateHTML(ctx, composited[0], w)
+	}
+
 	// Calculate target dimensions from the first frame.
 	firstBounds := composited[0].Bounds()
 	origW := firstBounds.Dx()
@@ -92,9 +99,12 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		}
 	}
 
+	// Build CSS keyframes for all frames.
+	allKeyframes := buildAllKeyframes(len(composited), g)
+
 	// Build frame data.
 	frames := make([]gifFrameData, 0, len(composited))
-	var cumulativeDelay float64
+	var totalDuration float64
 
 	for i, img := range composited {
 		if i%5 == 0 {
@@ -105,7 +115,6 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 
 		scaled := c.scaleToSize(img, targetW, targetH)
 
-
 		rows, err := c.buildRows(ctx, scaled)
 		if err != nil {
 			return err
@@ -114,25 +123,22 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 		delay := gifDelay(g, i)
 
 		frames = append(frames, gifFrameData{
-			Rows:     rows,
-			DelayCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
+			Rows:      rows,
+			Keyframes: allKeyframes[i],
 		})
 
-		cumulativeDelay += delay
+		totalDuration += delay
 	}
-
-	// Build CSS keyframes.
-	keyframes := buildKeyframes(len(frames), g)
 
 	data := &gifTemplateData{
 		WithHTML:         c.withHTML,
 		Title:            html.EscapeString(c.htmlTitle),
 		Width:            targetW,
 		Height:           targetH,
-		TotalDurationCSS: fmt.Sprintf("%.3fs", cumulativeDelay),
+		TotalDurationCSS: fmt.Sprintf("%.3fs", totalDuration),
 		Frames:           frames,
-		Keyframes:        keyframes,
 		SmoothLoad:       c.smoothLoad,
+		Obfuscate:        c.obfuscate, // fixed
 	}
 
 	return gifTmpl.Execute(w, data)
@@ -141,46 +147,88 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 // compositeFrames renders each GIF frame onto a full-size canvas, handling
 // the GIF disposal method to produce complete images for each frame.
 func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
-	// Use the overall GIF dimensions as the canvas size.
-	canvasW := g.Config.Width
-	canvasH := g.Config.Height
-	if canvasW == 0 || canvasH == 0 {
-		// Fallback: use first frame bounds.
+	width, height := g.Config.Width, g.Config.Height
+	if width == 0 || height == 0 {
 		b := g.Image[0].Bounds()
-		canvasW = b.Max.X
-		canvasH = b.Max.Y
+		width, height = b.Dx(), b.Dy()
 	}
 
-	canvas := image.NewRGBA(image.Rect(0, 0, canvasW, canvasH))
+	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
 	result := make([]*image.RGBA, 0, len(g.Image))
 
+	var prevState *image.RGBA // for DisposalPrevious
+
 	for i, frame := range g.Image {
-		// Draw this frame onto the canvas.
+		// Apply disposal from PREVIOUS frame before drawing current (standard behavior)
+		if i > 0 && i-1 < len(g.Disposal) {
+			switch g.Disposal[i-1] {
+			case gif.DisposalBackground:
+				draw.Draw(canvas, frame.Bounds(), image.NewUniform(color.Transparent), image.Point{}, draw.Src)
+			case gif.DisposalPrevious:
+				if prevState != nil {
+					copy(canvas.Pix, prevState.Pix)
+				}
+			}
+		}
+
 		draw.Draw(canvas, frame.Bounds(), frame, frame.Bounds().Min, draw.Over)
 
-		// Snapshot the current canvas.
 		snapshot := image.NewRGBA(canvas.Bounds())
 		copy(snapshot.Pix, canvas.Pix)
 		result = append(result, snapshot)
 
-		// Handle disposal.
-		if i < len(g.Disposal) {
-			switch g.Disposal[i] {
-			case gif.DisposalBackground:
-				// Clear the frame area to transparent.
-				draw.Draw(canvas, frame.Bounds(),
-					image.NewUniform(color.Transparent), image.Point{}, draw.Src)
-			case gif.DisposalPrevious:
-				// Restore to previous frame (re-copy previous snapshot).
-				if i > 0 {
-					copy(canvas.Pix, result[i-1].Pix)
-				}
-			}
-			// DisposalNone (0) or default: leave canvas as-is.
+		// Save state for next DisposalPrevious
+		if i < len(g.Disposal) && g.Disposal[i] == gif.DisposalPrevious {
+			prevState = image.NewRGBA(canvas.Bounds())
+			copy(prevState.Pix, canvas.Pix)
+		} else {
+			prevState = nil
 		}
 	}
 
 	return result
+}
+
+// sampleFrames reduces composited frames to fit within the maxFrames budget.
+// It always preserves the first and last frames, sampling the middle frames
+// uniformly. The returned GIF is a shallow copy with only the sampled Delay
+// and Disposal entries, so keyframe timing stays correct.
+func (c *Converter) sampleFrames(frames []*image.RGBA, g *gif.GIF) ([]*image.RGBA, *gif.GIF) {
+	n := len(frames)
+	if c.maxFrames <= 0 || n <= c.maxFrames {
+		return frames, g
+	}
+
+	// Build sampled indices: always include first and last.
+	indices := make([]int, 0, c.maxFrames)
+	indices = append(indices, 0)
+	for i := 1; i < c.maxFrames-1; i++ {
+		idx := i * (n - 1) / (c.maxFrames - 1)
+		indices = append(indices, idx)
+	}
+	indices = append(indices, n-1)
+
+	sampled := make([]*image.RGBA, len(indices))
+	sampledDelay := make([]int, len(indices))
+	sampledDisposal := make([]byte, len(indices))
+	for i, idx := range indices {
+		sampled[i] = frames[idx]
+		if idx < len(g.Delay) {
+			sampledDelay[i] = g.Delay[idx]
+		}
+		if idx < len(g.Disposal) {
+			sampledDisposal[i] = g.Disposal[idx]
+		}
+	}
+
+	// Shallow copy the GIF with sampled slices.
+	sg := *g
+	sg.Delay = sampledDelay
+	sg.Disposal = sampledDisposal
+	// Clear Image slice — we don't use it after compositing.
+	sg.Image = nil
+
+	return sampled, &sg
 }
 
 // scaleToSize scales an image to the given target dimensions.
@@ -209,9 +257,8 @@ func gifDelay(g *gif.GIF, i int) float64 {
 	return 0.1 // default 100ms
 }
 
-// buildKeyframes generates CSS @keyframes steps for the animation.
-// Each frame gets a "visible" window proportional to its delay in the total duration.
-func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
+// buildAllKeyframes generates absolute-timed CSS @keyframes for each frame.
+func buildAllKeyframes(frameCount int, g *gif.GIF) [][]gifKeyframe {
 	if frameCount == 0 {
 		return nil
 	}
@@ -222,7 +269,7 @@ func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
 		totalDelay += gifDelay(g, i)
 	}
 
-	var keyframes []gifKeyframe
+	var result [][]gifKeyframe
 	var cumulative float64
 
 	for i := range frameCount {
@@ -230,23 +277,31 @@ func buildKeyframes(frameCount int, g *gif.GIF) []gifKeyframe {
 		delay := gifDelay(g, i)
 		offPct := (cumulative + delay) / totalDelay * 100
 
-		// Show frame at onPct, hide at offPct.
-		keyframes = append(keyframes,
-			gifKeyframe{Percent: fmt.Sprintf("%.4f%%", onPct), Opacity: 1},
-		)
-		if i < frameCount-1 {
-			keyframes = append(keyframes,
-				gifKeyframe{Percent: fmt.Sprintf("%.4f%%", offPct), Opacity: 0},
-			)
+		var keyframes []gifKeyframe
+
+		// Start hidden if not the very first frame to appear.
+		if onPct > 0 {
+			keyframes = append(keyframes, gifKeyframe{Percent: "0%", Opacity: 0})
 		}
 
+		// Show frame.
+		keyframes = append(keyframes, gifKeyframe{Percent: fmt.Sprintf("%.4f%%", onPct), Opacity: 1})
+
+		// Hide frame when its delay expires.
+		if offPct < 100 {
+			keyframes = append(keyframes, gifKeyframe{Percent: fmt.Sprintf("%.4f%%", offPct), Opacity: 0})
+		}
+
+		// End: last frame stays visible until the loop restarts; others hide.
+		if i == frameCount-1 {
+			keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 1})
+		} else {
+			keyframes = append(keyframes, gifKeyframe{Percent: "100%", Opacity: 0})
+		}
+
+		result = append(result, keyframes)
 		cumulative += delay
 	}
 
-	// End at 100%.
-	keyframes = append(keyframes,
-		gifKeyframe{Percent: "100%", Opacity: 0},
-	)
-
-	return keyframes
+	return result
 }

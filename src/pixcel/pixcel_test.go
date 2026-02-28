@@ -473,12 +473,15 @@ func TestConvertGIF_SingleFrame(t *testing.T) {
 	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""))
 	var buf bytes.Buffer
 
-	// Single-frame GIF should still work through ConvertGIF.
+	// Single-frame GIF should fall back to the static table path.
 	err := converter.ConvertGIF(context.Background(), g, &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Equal(t, 1, strings.Count(output, `class="pixcel-frame"`))
+	// Should produce a plain table, not the animation wrapper.
+	assert.Contains(t, output, "<table")
+	assert.NotContains(t, output, `class="pixcel-frame"`)
+	assert.NotContains(t, output, "pixcel-stage")
 }
 
 func TestConvertGIF_NilGIF(t *testing.T) {
@@ -545,10 +548,63 @@ func TestConvertGIF_KeyframesTiming(t *testing.T) {
 	output := buf.String()
 	// Total duration = 0.2s
 	assert.Contains(t, output, "0.200s")
-	// First frame delay = 0s
-	assert.Contains(t, output, `animation-delay: 0.000s`)
-	// Second frame delay = 0.1s
-	assert.Contains(t, output, `animation-delay: 0.100s`)
+	// First frame animation
+	assert.Contains(t, output, `animation: pixcel-anim-0 0.200s`)
+	assert.Contains(t, output, `0.0000% { opacity: 1; }`)
+	// Second frame animation
+	assert.Contains(t, output, `animation: pixcel-anim-1 0.200s`)
+	assert.Contains(t, output, `50.0000% { opacity: 1; }`)
+}
+
+func TestConvertGIF_LastFrameVisibleAtEnd(t *testing.T) {
+	// With 3 frames, the last frame's keyframes should end at 100% with opacity 1
+	// to avoid a blank gap before the animation loops.
+	g := createTestGIF(3, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "Last Frame"))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	// The last frame (pixcel-anim-2) must end visible.
+	assert.Contains(t, output, `@keyframes pixcel-anim-2`)
+	// Non-last frames should still end hidden.
+	assert.Contains(t, output, `animation: pixcel-anim-0`)
+	assert.Contains(t, output, `animation: pixcel-anim-1`)
+}
+
+func TestBuildAllKeyframes_LastFrameEndsVisible(t *testing.T) {
+	g := createTestGIF(3, 10)
+	kfs := buildAllKeyframes(3, g)
+	require.Len(t, kfs, 3)
+
+	// First two frames should end at 100% with opacity 0.
+	lastKF0 := kfs[0][len(kfs[0])-1]
+	assert.Equal(t, "100%", lastKF0.Percent)
+	assert.Equal(t, 0, lastKF0.Opacity)
+
+	lastKF1 := kfs[1][len(kfs[1])-1]
+	assert.Equal(t, "100%", lastKF1.Percent)
+	assert.Equal(t, 0, lastKF1.Opacity)
+
+	// Last frame should end at 100% with opacity 1 (stays visible).
+	lastKF2 := kfs[2][len(kfs[2])-1]
+	assert.Equal(t, "100%", lastKF2.Percent)
+	assert.Equal(t, 1, lastKF2.Opacity)
+}
+
+func TestConvertGIF_FrameCSSSizing(t *testing.T) {
+	// Verify the CSS fixes: frames have width/height 100% and first child is visible.
+	g := createTestGIF(2, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(true, "CSS Fix"))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+
+	output := buf.String()
+	assert.Contains(t, output, "width: 100%")
+	assert.Contains(t, output, "height: 100%")
+	assert.Contains(t, output, ".pixcel-frame:first-child { opacity: 1; }")
 }
 
 func TestConvertGIF_DisposalBackground(t *testing.T) {
@@ -708,7 +764,7 @@ func TestBuildRows_CancelledContext(t *testing.T) {
 
 func TestBuildKeyframes_ZeroFrames(t *testing.T) {
 	g := &gif.GIF{}
-	kf := buildKeyframes(0, g)
+	kf := buildAllKeyframes(0, g)
 	assert.Nil(t, kf)
 }
 
@@ -787,8 +843,8 @@ func TestConvertGIF_WithSmoothLoad(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	assert.Contains(t, output, "visibility: hidden")
-	assert.Contains(t, output, `.loaded`)
+	// SmoothLoad hides the container, not individual frames.
+	assert.Contains(t, output, `.pixcel-container.loaded`)
 	assert.Contains(t, output, `<script>`)
 }
 
@@ -800,7 +856,8 @@ func TestConvertGIF_WithoutSmoothLoad(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	assert.NotContains(t, output, "visibility: hidden")
+	// Without SmoothLoad, container should not have the loaded class or script.
+	assert.NotContains(t, output, `.pixcel-container.loaded`)
 	assert.NotContains(t, output, `<script>`)
 }
 
@@ -854,17 +911,17 @@ func TestConvertGIF_WithScaler(t *testing.T) {
 func TestObfuscation_ColorFormatting(t *testing.T) {
 	// 100 runs to ensure we hit variations
 	for i := 0; i < 100; i++ {
-		// Pure Red
-		out := formatColor(255, 0, 0, true)
-		
+		// Pure Red, fully opaque
+		out := formatColor(255, 0, 0, 255, true)
+
 		// Verify it validly formats to one of the expected variations
-		// formatColor returns "prop:value" e.g. "BacKground-color:rgb(255,0,0)"
+		// formatColor returns "prop:value" e.g. "BacKground-color:rgba(255,0,0,1)"
 		// Validate it contains a colon separating property from value.
 		outStr := string(out)
 		isValid := strings.Contains(outStr, ":") &&
 			(strings.Contains(outStr, "#") ||
-				strings.Contains(outStr, "rgb(") ||
-				strings.Contains(outStr, "hsl("))
+				strings.Contains(outStr, "rgba(") ||
+				strings.Contains(outStr, "hsla("))
 
 		assert.True(t, isValid, "Output format not recognized: %s", out)
 	}
@@ -878,12 +935,12 @@ func TestConverter_Convert_WithObfuscation(t *testing.T) {
 	require.NoError(t, converter.Convert(context.Background(), img, &buf))
 
 	output := buf.String()
-	
+
 	// Ensure we are getting styles or bgcolors
 	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
-	
+
 	// Shouldn't contain regular unified format only
-	assert.NotEqual(t, strings.Count(output, `bgcolor="#ff0000"`), 1) 
+	assert.NotEqual(t, strings.Count(output, `bgcolor="#ff0000"`), 1)
 }
 
 func TestConvertGIF_WithObfuscation(t *testing.T) {
@@ -894,7 +951,7 @@ func TestConvertGIF_WithObfuscation(t *testing.T) {
 	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
 
 	output := buf.String()
-	
+
 	assert.True(t, strings.Contains(output, "style") || strings.Contains(output, "bgcolor"))
 }
 
@@ -924,9 +981,9 @@ func TestRgbToHSL_HighLuminance(t *testing.T) {
 	// l > 0.5 branch: a light colour where (max+min)/2 > 0.5
 	// e.g. rgb(200, 220, 255) — blue dominant, light
 	h, s, l := rgbToHSL(200, 220, 255)
-	assert.Greater(t, l, 50)  // L > 50%
-	assert.Greater(t, s, 0)   // chromatic, not grey
-	assert.Greater(t, h, 0)   // some hue
+	assert.Greater(t, l, 50) // L > 50%
+	assert.Greater(t, s, 0)  // chromatic, not grey
+	assert.Greater(t, h, 0)  // some hue
 }
 
 func TestRgbToHSL_HueWrap(t *testing.T) {
@@ -949,7 +1006,186 @@ func TestRgbToHSL_BlueMinimum(t *testing.T) {
 	// bf < minC branch: red > green > blue, so bf ends up as minC
 	// rgb(200, 150, 50): rf=max, bf=min
 	h, s, l := rgbToHSL(200, 150, 50)
-	assert.Greater(t, h, 0)  // warm hue (yellow-orange range)
+	assert.Greater(t, h, 0) // warm hue (yellow-orange range)
 	assert.Greater(t, s, 0)
 	assert.Greater(t, l, 0)
+}
+
+// --- MaxFrames tests ---
+
+func TestWithMaxFrames_Default(t *testing.T) {
+	c := New()
+	assert.Equal(t, 10, c.maxFrames, "default maxFrames should be 10")
+}
+
+func TestWithMaxFrames_Custom(t *testing.T) {
+	c := New(WithMaxFrames(20))
+	assert.Equal(t, 20, c.maxFrames)
+}
+
+func TestWithMaxFrames_ZeroIgnored(t *testing.T) {
+	c := New(WithMaxFrames(0))
+	assert.Equal(t, 10, c.maxFrames, "zero should be ignored, keeping default")
+}
+
+func TestWithMaxFrames_NegativeIgnored(t *testing.T) {
+	c := New(WithMaxFrames(-10))
+	assert.Equal(t, 10, c.maxFrames, "negative should be ignored, keeping default")
+}
+
+func TestConvertGIF_MaxFramesSampling(t *testing.T) {
+	// 10-frame GIF with maxFrames=5 should produce exactly 5 frame divs.
+	g := createTestGIF(10, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithMaxFrames(5))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+	assert.Equal(t, 5, strings.Count(buf.String(), `class="pixcel-frame"`))
+}
+
+func TestConvertGIF_MaxFrames_UnderLimit(t *testing.T) {
+	// 3-frame GIF with maxFrames=50 should not be sampled.
+	g := createTestGIF(3, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithMaxFrames(50))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+	assert.Equal(t, 3, strings.Count(buf.String(), `class="pixcel-frame"`))
+}
+
+func TestSampleFrames_PreservesFirstAndLast(t *testing.T) {
+	g := createTestGIF(10, 10)
+	c := New(WithMaxFrames(3))
+
+	composited := c.compositeFrames(g)
+	first := composited[0]
+	last := composited[len(composited)-1]
+
+	sampled, sg := c.sampleFrames(composited, g)
+	require.Len(t, sampled, 3)
+	assert.Same(t, first, sampled[0], "first frame must be preserved")
+	assert.Same(t, last, sampled[len(sampled)-1], "last frame must be preserved")
+	assert.Len(t, sg.Delay, 3)
+}
+
+func TestSampleFrames_NoOp(t *testing.T) {
+	g := createTestGIF(5, 10)
+	c := New(WithMaxFrames(10))
+
+	composited := c.compositeFrames(g)
+	sampled, sg := c.sampleFrames(composited, g)
+	assert.Len(t, sampled, 5, "should not sample when under the limit")
+	assert.Same(t, g, sg, "GIF pointer should be unchanged")
+}
+
+// --- Coverage: clamp255 ---
+
+func TestClamp255_Above(t *testing.T) {
+	assert.Equal(t, 255.0, clamp255(300.0))
+}
+
+func TestClamp255_Below(t *testing.T) {
+	assert.Equal(t, 0.0, clamp255(-10.0))
+}
+
+func TestClamp255_InRange(t *testing.T) {
+	assert.Equal(t, 128.0, clamp255(128.0))
+}
+
+// --- Coverage: colorAt with transparent and semi-transparent pixels ---
+
+func TestColorAt_FullyTransparent(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 100, G: 200, B: 50, A: 0}) // fully transparent
+	r, g, b, a := colorAt(img, 0, 0)
+	assert.Equal(t, uint8(0), r)
+	assert.Equal(t, uint8(0), g)
+	assert.Equal(t, uint8(0), b)
+	assert.Equal(t, uint8(0), a)
+}
+
+func TestColorAt_SemiTransparent(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 200, G: 100, B: 50, A: 128})
+	r, g, b, a := colorAt(img, 0, 0)
+	assert.Equal(t, uint8(128), a)
+	// The un-premultiplied values should be close to the original.
+	assert.InDelta(t, 200, int(r), 2)
+	assert.InDelta(t, 100, int(g), 2)
+	assert.InDelta(t, 50, int(b), 2)
+}
+
+// --- Coverage: formatColor non-opaque without obfuscation ---
+
+func TestFormatColor_SemiTransparent_NoObfuscation(t *testing.T) {
+	out := formatColor(255, 0, 0, 128, false)
+	assert.Equal(t, "background-color:#ff000080", out)
+}
+
+// --- Coverage: generateGIFHTML edge cases ---
+
+func TestConvertGIF_ZeroDimensionComposited(t *testing.T) {
+	// GIF where composited frame has zero dimensions.
+	g := &gif.GIF{}
+	g.Config.Width = 0
+	g.Config.Height = 0
+	frame := image.NewPaletted(image.Rect(0, 0, 0, 0), color.Palette{color.Black})
+	g.Image = append(g.Image, frame, frame) // 2 frames to avoid single-frame fallback
+	g.Delay = append(g.Delay, 10, 10)
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	assert.ErrorIs(t, err, ErrInvalidDimensions)
+}
+
+func TestConvertGIF_TargetHZeroMultiFrame(t *testing.T) {
+	// Multi-frame GIF where proportional height rounds to 0, should clamp to 1.
+	g := &gif.GIF{}
+	g.Config.Width = 1000
+	g.Config.Height = 1
+	frame := image.NewPaletted(image.Rect(0, 0, 1000, 1), color.Palette{color.White})
+	for x := range 1000 {
+		frame.SetColorIndex(x, 0, 0)
+	}
+	g.Image = append(g.Image, frame, frame) // 2 frames
+	g.Delay = append(g.Delay, 10, 10)
+
+	converter := New(WithTargetWidth(10), WithHTMLWrapper(false, ""))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `height="1"`)
+}
+
+func TestConvertGIF_ContextCancel_InMultiFrameLoop(t *testing.T) {
+	// Cancel at exactly the i%5==0 context check inside the frame-processing loop.
+	// Call sequence: (1) entry check → ok, (2) i=0 i%5==0 check → cancel here.
+	g := createTestGIF(2, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 1, // pass entry, fail on the first i%5==0 check
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestConvertGIF_BuildRowsError_InMultiFrameLoop(t *testing.T) {
+	// Cancel at just the right time to trigger the buildRows error path.
+	g := createTestGIF(2, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 3, // pass initial + frame-loop checks, fail inside buildTable
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
 }

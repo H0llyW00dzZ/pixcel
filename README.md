@@ -73,6 +73,9 @@ pixcel convert photo.png -W 300 --scaler catmullrom -o photo.html
 
 # Generate bot-resistant HTML (randomized inline CSS for CAPTCHAs)
 pixcel convert noise.png -W 120 --obfuscate -o captcha.html
+
+# Limit animated GIF to 5 frames (uniformly sampled)
+pixcel convert animation.gif -W 64 --max-frames 5 -o anim.html
 ```
 
 ### SDK
@@ -121,6 +124,7 @@ func main() {
 | `WithSmoothLoad` | `--smooth-load` | `false` | Hide content until fully loaded to prevent progressive rendering |
 | `WithScaler` | `--scaler` | `nearest` | Scaling algorithm: `nearest`, `catmullrom`, `bilinear`, `approxbilinear` |
 | `WithObfuscation` | `--obfuscate` | `false` | Randomize inline CSS styling formats for CAPTCHA/scraping protection |
+| `WithMaxFrames` | `--max-frames` | `10` | Maximum GIF frames to process (excess frames are sampled uniformly) |
 | — | `-t, --title` | `Go Pixel Art` | HTML page title |
 | — | `-o, --output` | `go_pixel_art.html` | Output file path |
 
