@@ -190,22 +190,13 @@ func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) (image.Im
 	return destImg, nil
 }
 
-// buildRows creates the cell rows from a scaled image, checking context periodically.
+// buildRows creates the cell rows from a scaled image via 2D meshing.
 func (c *Converter) buildRows(ctx context.Context, img image.Image) ([][]Cell, error) {
 	bounds := img.Bounds()
 	h := bounds.Max.Y
 	w := bounds.Max.X
 
-	rows := make([][]Cell, 0, h)
-	for y := range h {
-		if y%10 == 0 {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-		}
-		rows = append(rows, buildRow(img, y, w))
-	}
-	return rows, nil
+	return buildTable(ctx, img, w, h)
 }
 
 // gifDelay returns the delay for frame i in seconds.

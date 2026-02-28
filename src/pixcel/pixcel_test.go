@@ -62,8 +62,8 @@ func TestConverter_Convert(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, `<table width="4" height="4"`)
-	assert.Contains(t, output, `<td colspan="4" style="width:4px;height:1px" bgcolor="#ff0000"></td>`)
-	assert.Contains(t, output, `<td colspan="4" style="width:4px;height:1px" bgcolor="#0000ff"></td>`)
+	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px" bgcolor="#ff0000"></td>`)
+	assert.Contains(t, output, `<td colspan="4" rowspan="2" style="width:4px;height:2px" bgcolor="#0000ff"></td>`)
 }
 
 func TestConverter_Convert_WithHTMLWrapper(t *testing.T) {
@@ -204,29 +204,48 @@ func TestConverter_Convert_TableOnlyNoWrapper(t *testing.T) {
 	assert.NotContains(t, output, "pixcel-container")
 }
 
-func TestBuildRow_SingleColor(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 5, 1))
-	for x := range 5 {
-		img.Set(x, 0, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+func TestBuildTable_SingleColor(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 5, 5))
+	for y := range 5 {
+		for x := range 5 {
+			img.Set(x, y, color.RGBA{R: 10, G: 20, B: 30, A: 255})
+		}
 	}
 
-	row := buildRow(img, 0, 5)
-	require.Len(t, row, 1)
-	assert.Equal(t, 5, row[0].Colspan)
-	assert.Equal(t, "#0a141e", row[0].Color)
+	rows, err := buildTable(context.Background(), img, 5, 5)
+	require.NoError(t, err)
+	require.Len(t, rows, 5)
+
+	// The first row should contain the single 5x5 cell
+	require.Len(t, rows[0], 1)
+	assert.Equal(t, 5, rows[0][0].Colspan)
+	assert.Equal(t, 5, rows[0][0].Rowspan)
+	assert.Equal(t, "#0a141e", rows[0][0].Color)
+
+	// The other rows should be completely empty because they were consumed by rowspan
+	for y := 1; y < 5; y++ {
+		assert.Empty(t, rows[y])
+	}
 }
 
-func TestBuildRow_AlternatingColors(t *testing.T) {
-	img := image.NewRGBA(image.Rect(0, 0, 3, 1))
+func TestBuildTable_AlternatingColors(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
 	img.Set(0, 0, color.RGBA{R: 255, A: 255})
 	img.Set(1, 0, color.RGBA{G: 255, A: 255})
-	img.Set(2, 0, color.RGBA{B: 255, A: 255})
+	img.Set(0, 1, color.RGBA{B: 255, A: 255})
+	img.Set(1, 1, color.RGBA{R: 10, G: 10, B: 10, A: 255})
 
-	row := buildRow(img, 0, 3)
-	require.Len(t, row, 3)
-	for _, cell := range row {
-		assert.Equal(t, 1, cell.Colspan)
-	}
+	rows, err := buildTable(context.Background(), img, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	require.Len(t, rows[0], 2)
+	assert.Equal(t, 1, rows[0][0].Colspan)
+	assert.Equal(t, 1, rows[0][0].Rowspan)
+	assert.Equal(t, 1, rows[0][1].Colspan)
+	assert.Equal(t, 1, rows[0][1].Rowspan)
+
+	require.Len(t, rows[1], 2)
 }
 
 func TestScaleImage_Proportional(t *testing.T) {
@@ -302,6 +321,7 @@ func TestMultipleColspanPerRow(t *testing.T) {
 	require.NoError(t, converter.Convert(context.Background(), img, &buf))
 	output := buf.String()
 
+	// It should now find exactly three 2x1 cells
 	assert.Equal(t, 3, strings.Count(output, `colspan="2"`), "expected 3 colspan=2 groups")
 }
 
