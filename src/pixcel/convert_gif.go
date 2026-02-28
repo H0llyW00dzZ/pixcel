@@ -101,10 +101,8 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 			}
 		}
 
-		scaled, err := c.scaleToSize(img, targetW, targetH)
-		if err != nil {
-			return err
-		}
+		scaled := c.scaleToSize(img, targetW, targetH)
+
 
 		rows, err := c.buildRows(ctx, scaled)
 		if err != nil {
@@ -184,10 +182,10 @@ func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
 }
 
 // scaleToSize scales an image to the given target dimensions.
-func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) (image.Image, error) {
+func (c *Converter) scaleToSize(img image.Image, targetW, targetH int) *image.RGBA {
 	destImg := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
 	xdraw.NearestNeighbor.Scale(destImg, destImg.Bounds(), img, img.Bounds(), xdraw.Over, nil)
-	return destImg, nil
+	return destImg
 }
 
 // buildRows creates the cell rows from a scaled image via 2D meshing.

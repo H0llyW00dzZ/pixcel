@@ -126,7 +126,7 @@ func buildTable(ctx context.Context, img image.Image, width, height int) ([][]Ce
 
 			r8, g8, b8 := colorAt(img, x, y)
 			w := expandWidth(img, visited[y], x, y, width, r8, g8, b8)
-			h := expandHeight(img, visited, x, y, w, height, r8, g8, b8)
+			h := expandHeight(img, x, y, w, height, r8, g8, b8)
 			markVisited(visited, x, y, w, h)
 
 			currentRow = append(currentRow, Cell{
@@ -163,10 +163,10 @@ func expandWidth(img image.Image, visitedRow []bool, x, y, width int, r8, g8, b8
 
 // expandHeight calculates how many rows below y share the exact same color strip
 // of width w starting at column x, without overlapping already-visited cells.
-func expandHeight(img image.Image, visited [][]bool, x, y, w, height int, r8, g8, b8 uint8) int {
+func expandHeight(img image.Image, x, y, w, height int, r8, g8, b8 uint8) int {
 	h := 1
 	for y+h < height {
-		if !rowMatchesColor(img, visited[y+h], x, y+h, w, r8, g8, b8) {
+		if !rowMatchesColor(img, x, y+h, w, r8, g8, b8) {
 			break
 		}
 		h++
@@ -176,11 +176,8 @@ func expandHeight(img image.Image, visited [][]bool, x, y, w, height int, r8, g8
 
 // rowMatchesColor checks whether every pixel in the range [x, x+w) on the given
 // row at vertical position y matches the anchor color and is unvisited.
-func rowMatchesColor(img image.Image, visitedRow []bool, x, y, w int, r8, g8, b8 uint8) bool {
+func rowMatchesColor(img image.Image, x, y, w int, r8, g8, b8 uint8) bool {
 	for dx := range w {
-		if visitedRow[x+dx] {
-			return false
-		}
 		nr, ng, nb := colorAt(img, x+dx, y)
 		if nr != r8 || ng != g8 || nb != b8 {
 			return false

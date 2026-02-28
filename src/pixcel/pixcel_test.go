@@ -302,6 +302,34 @@ func TestGenerateHTML_CancelledContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
+type cancelOnBoundsImage struct {
+	image.Image
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnBoundsImage) Bounds() image.Rectangle {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	return c.Image.Bounds()
+}
+
+func TestGenerateHTML_CancellationDuringBuild(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	// cancel will be called when Bounds() is accessed during scaleImage
+
+	img := &cancelOnBoundsImage{
+		Image:  createTestImage(),
+		cancel: cancel,
+	}
+
+	c := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := c.generateHTML(ctx, img, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func TestMultipleColspanPerRow(t *testing.T) {
 	// Create image: 2 red, 2 blue, 2 green → 3 colspan groups
 	img := image.NewRGBA(image.Rect(0, 0, 6, 1))
@@ -591,18 +619,78 @@ func TestConvertGIF_ZeroDimensionFrame(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidDimensions)
 }
 
+type mockContext struct {
+	context.Context
+	cancelCount int
+	cancelAt    int
+}
+
+func (m *mockContext) Err() error {
+	m.cancelCount++
+	if m.cancelCount > m.cancelAt {
+		return context.Canceled
+	}
+	return nil
+}
+
 func TestConvertGIF_ManyFrames_ContextCancel(t *testing.T) {
-	// 10+ frames to trigger the i%5==0 context check inside generateGIFHTML.
+	// Cancel before ConvertGIF is called
 	g := createTestGIF(10, 10)
 	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
 	converter := New(WithTargetWidth(4))
 	var buf bytes.Buffer
 
-	// Cancel after a brief period — should trigger context check in frame loop.
-	cancel()
 	err := converter.ConvertGIF(ctx, g, &buf)
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestConvertGIF_ContextCancel_InFrameLoop(t *testing.T) {
+	g := createTestGIF(1, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 1, // fails at the second call (inside frame loop)
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestConvertGIF_ContextCancel_InBuildRows(t *testing.T) {
+	g := createTestGIF(1, 10)
+	ctx := &mockContext{
+		Context:  context.Background(),
+		cancelAt: 2, // fails at the third call (inside buildTable y=0)
+	}
+
+	converter := New(WithTargetWidth(4))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(ctx, g, &buf)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestConvertGIF_TargetHMightBeZero(t *testing.T) {
+	// targetH would be 0 naturally, so it should be clamped to 1.
+	g := createTestGIF(1, 10)
+	g.Config.Width = 100
+	g.Config.Height = 1
+	// modify the frame to width 100
+	frame := image.NewPaletted(image.Rect(0, 0, 100, 1), color.Palette{color.White})
+	g.Image[0] = frame
+
+	converter := New(WithTargetWidth(10), WithHTMLWrapper(false, ""))
+	var buf bytes.Buffer
+
+	err := converter.ConvertGIF(context.Background(), g, &buf)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, `height="1"`)
 }
 
 func TestBuildRows_CancelledContext(t *testing.T) {
