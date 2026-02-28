@@ -22,9 +22,9 @@ Convert images into HTML table-based pixel art.
 
 Given an image matrix $I$ of dimensions $W \times H$, the algorithm finds maximal rectangles of uniform color:
 
-$$w = \max \left\{ n \geq 1 \;\middle|\; \forall\, k \in [0, n): \; I(x_0+k,\, y_0) = c_0 \right\}$$
-
-$$h = \max \left\{ m \geq 1 \;\middle|\; \forall\, j \in [0, m),\; \forall\, k \in [0, w): \; I(x_0+k,\, y_0+j) = c_0 \right\}$$
+> $$w = \max \lbrace \; n \geq 1 \mid \forall \; k \in [0, n) : I(x_0+k, \; y_0) = c_0 \; \rbrace$$
+>
+> $$h = \max \lbrace \; m \geq 1 \mid \forall \; j \in [0, m), \; \forall \; k \in [0, w) : I(x_0+k, \; y_0+j) = c_0 \; \rbrace$$
 
 Each rectangle emits a single cell: `<td colspan="w" rowspan="h">`, achieving $O(W \times H)$ time complexity with up to **95%+ payload reduction** compared to naive pixel-per-cell output.
 
