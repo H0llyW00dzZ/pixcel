@@ -133,7 +133,7 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 
 			var cellColor string
 			if a8 > 0 {
-				cellColor = formatColor(r8, g8, b8, obfuscate)
+				cellColor = formatColor(r8, g8, b8, a8, obfuscate)
 			}
 
 			currentRow = append(currentRow, Cell{
@@ -149,8 +149,8 @@ func buildTable(ctx context.Context, img image.Image, width, height int, obfusca
 }
 
 // colorAt returns the 8-bit RGBA components of the pixel at (x, y).
-// Semi-transparent pixels are alpha-blended against white to produce
-// the final visible color, matching browser default background behavior.
+// Semi-transparent pixels are un-premultiplied to extract the true source
+// color, avoiding halo artifacts on non-white backgrounds.
 func colorAt(img image.Image, x, y int) (uint8, uint8, uint8, uint8) {
 	r, g, b, a := img.At(x, y).RGBA()
 	a8 := uint8(a >> 8)
@@ -160,12 +160,24 @@ func colorAt(img image.Image, x, y int) (uint8, uint8, uint8, uint8) {
 	if a8 == 255 {
 		return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), 255
 	}
-	// Blend against white: out = src * alpha + white * (1 - alpha)
-	fa := float64(a8) / 255.0
-	r8 := uint8(float64(r>>8)*fa + 255*(1-fa))
-	g8 := uint8(float64(g>>8)*fa + 255*(1-fa))
-	b8 := uint8(float64(b>>8)*fa + 255*(1-fa))
+	// Un-premultiply: Go's image.RGBA stores premultiplied alpha values.
+	// Divide by alpha to recover the true source color.
+	fa := float64(a) / 0xffff
+	r8 := uint8(clamp255(float64(r>>8) / fa))
+	g8 := uint8(clamp255(float64(g>>8) / fa))
+	b8 := uint8(clamp255(float64(b>>8) / fa))
 	return r8, g8, b8, a8
+}
+
+// clamp255 clamps a float to [0, 255].
+func clamp255(v float64) float64 {
+	if v > 255 {
+		return 255
+	}
+	if v < 0 {
+		return 0
+	}
+	return v
 }
 
 // expandWidth calculates the maximum horizontal span of consecutive pixels

@@ -854,17 +854,17 @@ func TestConvertGIF_WithScaler(t *testing.T) {
 func TestObfuscation_ColorFormatting(t *testing.T) {
 	// 100 runs to ensure we hit variations
 	for i := 0; i < 100; i++ {
-		// Pure Red
-		out := formatColor(255, 0, 0, true)
+		// Pure Red, fully opaque
+		out := formatColor(255, 0, 0, 255, true)
 		
 		// Verify it validly formats to one of the expected variations
-		// formatColor returns "prop:value" e.g. "BacKground-color:rgb(255,0,0)"
+		// formatColor returns "prop:value" e.g. "BacKground-color:rgba(255,0,0,1)"
 		// Validate it contains a colon separating property from value.
 		outStr := string(out)
 		isValid := strings.Contains(outStr, ":") &&
 			(strings.Contains(outStr, "#") ||
-				strings.Contains(outStr, "rgb(") ||
-				strings.Contains(outStr, "hsl("))
+				strings.Contains(outStr, "rgba(") ||
+				strings.Contains(outStr, "hsla("))
 
 		assert.True(t, isValid, "Output format not recognized: %s", out)
 	}
