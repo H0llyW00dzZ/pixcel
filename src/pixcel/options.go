@@ -82,3 +82,18 @@ func WithObfuscation(enabled bool) Option {
 		c.obfuscate = enabled
 	}
 }
+
+// WithMaxFrames sets the maximum number of frames to process when converting
+// an animated GIF. If the GIF contains more frames than this limit, frames
+// are sampled uniformly to stay within the budget while preserving the first
+// and last frames. The default is 10.
+//
+// This prevents excessively large HTML output and keeps CSS @keyframes
+// animation performant in browsers.
+func WithMaxFrames(n int) Option {
+	return func(c *Converter) {
+		if n > 0 {
+			c.maxFrames = n
+		}
+	}
+}

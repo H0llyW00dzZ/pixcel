@@ -26,6 +26,7 @@ var (
 	flagSmoothLoad bool
 	flagScaler     string
 	flagObfuscate  bool
+	flagMaxFrames  int
 )
 
 // convertCmd converts an image file to HTML pixel art.
@@ -46,6 +47,7 @@ func init() {
 	convertCmd.Flags().BoolVar(&flagSmoothLoad, "smooth-load", false, "hide content until fully loaded to prevent progressive rendering")
 	convertCmd.Flags().StringVar(&flagScaler, "scaler", "nearest", "scaling algorithm: nearest, catmullrom, bilinear, approxbilinear")
 	convertCmd.Flags().BoolVar(&flagObfuscate, "obfuscate", false, "randomize inline CSS styling formats for CAPTCHA/scraping protection")
+	convertCmd.Flags().IntVar(&flagMaxFrames, "max-frames", 10, "maximum number of GIF frames to process (excess frames are sampled uniformly)")
 
 	rootCmd.AddCommand(convertCmd)
 }
@@ -65,6 +67,7 @@ func runConvert(_ *cobra.Command, args []string) error {
 			pixcel.WithSmoothLoad(flagSmoothLoad),
 			pixcel.WithScaler(parseScaler(flagScaler)),
 			pixcel.WithObfuscation(flagObfuscate),
+			pixcel.WithMaxFrames(flagMaxFrames),
 		)
 
 		outFile, err := os.Create(flagOutput)

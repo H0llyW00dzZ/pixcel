@@ -23,6 +23,7 @@ type Converter struct {
 	smoothLoad   bool
 	obfuscate    bool
 	scaler       draw.Scaler
+	maxFrames    int
 }
 
 // New creates a new Converter with the provided options.
@@ -33,6 +34,7 @@ func New(opts ...Option) *Converter {
 		withHTML:    true,
 		htmlTitle:   "Go Pixel Art",
 		scaler:     draw.NearestNeighbor,
+		maxFrames:  10,
 	}
 
 	for _, opt := range opts {

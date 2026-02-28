@@ -73,6 +73,14 @@ func (c *Converter) generateGIFHTML(ctx context.Context, g *gif.GIF, w io.Writer
 	// Composite all frames into full images (handling GIF disposal).
 	composited := c.compositeFrames(g)
 
+	// Sample frames if exceeding maxFrames budget.
+	composited, g = c.sampleFrames(composited, g)
+
+	// Single frame after sampling — delegate to the lighter static path.
+	if len(composited) == 1 {
+		return c.generateHTML(ctx, composited[0], w)
+	}
+
 	// Calculate target dimensions from the first frame.
 	firstBounds := composited[0].Bounds()
 	origW := firstBounds.Dx()
@@ -179,6 +187,48 @@ func (c *Converter) compositeFrames(g *gif.GIF) []*image.RGBA {
 	}
 
 	return result
+}
+
+// sampleFrames reduces composited frames to fit within the maxFrames budget.
+// It always preserves the first and last frames, sampling the middle frames
+// uniformly. The returned GIF is a shallow copy with only the sampled Delay
+// and Disposal entries, so keyframe timing stays correct.
+func (c *Converter) sampleFrames(frames []*image.RGBA, g *gif.GIF) ([]*image.RGBA, *gif.GIF) {
+	n := len(frames)
+	if c.maxFrames <= 0 || n <= c.maxFrames {
+		return frames, g
+	}
+
+	// Build sampled indices: always include first and last.
+	indices := make([]int, 0, c.maxFrames)
+	indices = append(indices, 0)
+	for i := 1; i < c.maxFrames-1; i++ {
+		idx := i * (n - 1) / (c.maxFrames - 1)
+		indices = append(indices, idx)
+	}
+	indices = append(indices, n-1)
+
+	sampled := make([]*image.RGBA, len(indices))
+	sampledDelay := make([]int, len(indices))
+	sampledDisposal := make([]byte, len(indices))
+	for i, idx := range indices {
+		sampled[i] = frames[idx]
+		if idx < len(g.Delay) {
+			sampledDelay[i] = g.Delay[idx]
+		}
+		if idx < len(g.Disposal) {
+			sampledDisposal[i] = g.Disposal[idx]
+		}
+	}
+
+	// Shallow copy the GIF with sampled slices.
+	sg := *g
+	sg.Delay = sampledDelay
+	sg.Disposal = sampledDisposal
+	// Clear Image slice — we don't use it after compositing.
+	sg.Image = nil
+
+	return sampled, &sg
 }
 
 // scaleToSize scales an image to the given target dimensions.

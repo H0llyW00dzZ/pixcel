@@ -473,12 +473,15 @@ func TestConvertGIF_SingleFrame(t *testing.T) {
 	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""))
 	var buf bytes.Buffer
 
-	// Single-frame GIF should still work through ConvertGIF.
+	// Single-frame GIF should fall back to the static table path.
 	err := converter.ConvertGIF(context.Background(), g, &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Equal(t, 1, strings.Count(output, `class="pixcel-frame"`))
+	// Should produce a plain table, not the animation wrapper.
+	assert.Contains(t, output, "<table")
+	assert.NotContains(t, output, `class="pixcel-frame"`)
+	assert.NotContains(t, output, "pixcel-stage")
 }
 
 func TestConvertGIF_NilGIF(t *testing.T) {
@@ -1006,4 +1009,71 @@ func TestRgbToHSL_BlueMinimum(t *testing.T) {
 	assert.Greater(t, h, 0) // warm hue (yellow-orange range)
 	assert.Greater(t, s, 0)
 	assert.Greater(t, l, 0)
+}
+
+// --- MaxFrames tests ---
+
+func TestWithMaxFrames_Default(t *testing.T) {
+	c := New()
+	assert.Equal(t, 10, c.maxFrames, "default maxFrames should be 10")
+}
+
+func TestWithMaxFrames_Custom(t *testing.T) {
+	c := New(WithMaxFrames(20))
+	assert.Equal(t, 20, c.maxFrames)
+}
+
+func TestWithMaxFrames_ZeroIgnored(t *testing.T) {
+	c := New(WithMaxFrames(0))
+	assert.Equal(t, 10, c.maxFrames, "zero should be ignored, keeping default")
+}
+
+func TestWithMaxFrames_NegativeIgnored(t *testing.T) {
+	c := New(WithMaxFrames(-10))
+	assert.Equal(t, 10, c.maxFrames, "negative should be ignored, keeping default")
+}
+
+func TestConvertGIF_MaxFramesSampling(t *testing.T) {
+	// 10-frame GIF with maxFrames=5 should produce exactly 5 frame divs.
+	g := createTestGIF(10, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithMaxFrames(5))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+	assert.Equal(t, 5, strings.Count(buf.String(), `class="pixcel-frame"`))
+}
+
+func TestConvertGIF_MaxFrames_UnderLimit(t *testing.T) {
+	// 3-frame GIF with maxFrames=50 should not be sampled.
+	g := createTestGIF(3, 10)
+	converter := New(WithTargetWidth(4), WithHTMLWrapper(false, ""), WithMaxFrames(50))
+	var buf bytes.Buffer
+
+	require.NoError(t, converter.ConvertGIF(context.Background(), g, &buf))
+	assert.Equal(t, 3, strings.Count(buf.String(), `class="pixcel-frame"`))
+}
+
+func TestSampleFrames_PreservesFirstAndLast(t *testing.T) {
+	g := createTestGIF(10, 10)
+	c := New(WithMaxFrames(3))
+
+	composited := c.compositeFrames(g)
+	first := composited[0]
+	last := composited[len(composited)-1]
+
+	sampled, sg := c.sampleFrames(composited, g)
+	require.Len(t, sampled, 3)
+	assert.Same(t, first, sampled[0], "first frame must be preserved")
+	assert.Same(t, last, sampled[len(sampled)-1], "last frame must be preserved")
+	assert.Len(t, sg.Delay, 3)
+}
+
+func TestSampleFrames_NoOp(t *testing.T) {
+	g := createTestGIF(5, 10)
+	c := New(WithMaxFrames(10))
+
+	composited := c.compositeFrames(g)
+	sampled, sg := c.sampleFrames(composited, g)
+	assert.Len(t, sampled, 5, "should not sample when under the limit")
+	assert.Same(t, g, sg, "GIF pointer should be unchanged")
 }
